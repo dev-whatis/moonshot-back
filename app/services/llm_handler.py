@@ -2,17 +2,14 @@
 (llm_handler.py) Handles all Gemini interactions using the new google-genai SDK with chat sessions.
 Each instance of LLMHandler represents a single, self-contained conversation.
 """
-# --- MODIFICATION START ---
 import json
 import datetime
-# --- MODIFICATION END ---
 from google import genai
 from google.genai import types
 
-# --- MODIFICATION START ---
 from app.config import GEMINI_API_KEY, MODEL_NAME, DEFAULT_TEMPERATURE, MAX_TOKENS
-# --- MODIFICATION END ---
 from app.prompts import (
+    STEP0_GUARDRAIL_PROMPT,
     STEP1_SEARCH_TERM_PROMPT,
     STEP2_LINK_SELECTION_PROMPT,
     STEP3_MCQ_GENERATION_PROMPT,
@@ -21,6 +18,7 @@ from app.prompts import (
     STEP6_FINAL_RECOMMENDATIONS_PROMPT
 )
 from app.schemas import (
+    GUARDRAIL_RESPONSE_SCHEMA,
     GUIDE_SEARCH_TERM_SCHEMA,
     GUIDE_SEARCH_URLS_SCHEMA,
     MCQ_QUESTIONS_SCHEMA,
@@ -34,8 +32,6 @@ class LLMHandler:
         Initializes the handler and starts a new chat session immediately.
         """
         client = genai.Client(api_key=GEMINI_API_KEY)
-        # --- MODIFICATION START ---
-        # Use configuration from config.py instead of hardcoding values.
         self.chat = client.chats.create(
             model=MODEL_NAME,
             config=types.GenerateContentConfig(
@@ -43,7 +39,6 @@ class LLMHandler:
                 max_output_tokens=MAX_TOKENS
             )
         )
-        # --- MODIFICATION END ---
         if not self.chat:
              raise RuntimeError("Failed to create a new chat session with the Gemini API.")
 
@@ -94,6 +89,22 @@ class LLMHandler:
         response = self.chat.send_message(prompt, config=config)
 
         return response.text
+
+    # --- MODIFICATION START ---
+    def check_query_intent(self, user_query: str) -> dict:
+        """
+        Step 0: Use a guardrail to classify the user's intent.
+
+        Args:
+            user_query (str): The user's original query.
+
+        Returns:
+            dict: A dictionary with 'is_product_request' and 'reason'.
+        """
+        prompt = STEP0_GUARDRAIL_PROMPT.format(user_query=user_query)
+        result = self._send_message_with_schema(prompt, GUARDRAIL_RESPONSE_SCHEMA)
+        return result
+    # --- MODIFICATION END ---
 
     def generate_search_term(self, user_query: str) -> str:
         """
@@ -153,14 +164,11 @@ class LLMHandler:
         Returns:
             list: List of search query strings.
         """
-        # --- MODIFICATION START ---
-        # Dynamically inject the current year into the prompt.
         current_year = datetime.datetime.now().year
         prompt = STEP4_SEARCH_QUERY_PROMPT.format(
             user_answers_json=json.dumps(user_answers, indent=2),
             current_year=current_year
         )
-        # --- MODIFICATION END ---
         result = self._send_message_with_schema(prompt, REC_SEARCH_TERMS_SCHEMA)
         return result["rec_search_terms"]
 
@@ -174,8 +182,6 @@ class LLMHandler:
         Returns:
             list: List of selected URL objects with title and url.
         """
-        # --- MODIFICATION START ---
-        # Dynamically inject the current and previous year into the prompt.
         current_year = datetime.datetime.now().year
         previous_year = current_year - 1
         prompt = STEP5_WEBSITE_SELECTION_PROMPT.format(
@@ -183,7 +189,6 @@ class LLMHandler:
             current_year=current_year,
             previous_year=previous_year
         )
-        # --- MODIFICATION END ---
         result = self._send_message_with_schema(prompt, REC_SEARCH_URLS_SCHEMA)
         return result["rec_search_urls"]
 
@@ -197,10 +202,7 @@ class LLMHandler:
         Returns:
             str: Final recommendations in plain text.
         """
-        # --- MODIFICATION START ---
-        # Use the updated placeholder name.
         prompt = STEP6_FINAL_RECOMMENDATIONS_PROMPT.format(
             rec_scraped_contents_json=json.dumps(rec_scraped_contents, indent=2)
         )
-        # --- MODIFICATION END ---
         return self._send_message_text_only(prompt, use_thinking=True)

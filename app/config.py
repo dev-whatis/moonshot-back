@@ -9,10 +9,10 @@ def get_bool_from_env(key, default_value):
     value = os.getenv(key, str(default_value))
     return value.lower() in ('true', '1', 't')
 
-# --- MODIFICATION START ---
+
+
 # Configuration values that are deployment-specific but not secret are now hardcoded.
 # Secrets like API keys are still loaded from environment variables.
-# --- MODIFICATION END ---
 
 # --- Firebase Configuration ---
 # Set to False for local testing to bypass token verification.
@@ -21,13 +21,17 @@ AUTH_ENABLED = True
 
 # Path to your Firebase service account key JSON file.
 
-#For production environments (using Google Cloud Secret Manager)
+# For production environments (using Google Cloud Secret Manager)
+
 FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
 
-#For local testing
+# For local testing
 # The `firebase-service-account.json` file should be in the root directory.
 # Uncomment the line below to use a local service account key file.
-#FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
+
+# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
+
+
 
 # --- Serper API Configuration ---
 # This is a secret and should be set in your .env file

@@ -2,6 +2,31 @@
 (prompts.py) Prompt templates for all LLM interactions
 """
 
+# Step 0: Guardrail for Intent Classification
+STEP0_GUARDRAIL_PROMPT = """You are a content moderator for a product recommendation API. Your single and only task is to determine if the user's query is a request for a physical product recommendation. You must not answer the user's query.
+
+Analyze the user's query and classify it.
+
+- If the query is a valid request for a physical product, set `is_product_request` to `true`. The `reason` should be a simple confirmation like "The user is asking for a product recommendation."
+- If the query is NOT for a physical product (e.g., it's general chit-chat, a request for a service, an informational question, or harmful content), set `is_product_request` to `false` and provide a brief, user-facing `reason` for the rejection.
+
+### Examples of Valid Product Requests (is_product_request: true)
+- "I need a good laptop for college"
+- "best headphones under $100"
+- "recommend a durable coffee maker"
+- "what's a good camera for travel?"
+
+### Examples of Invalid Requests (is_product_request: false)
+- "Hi, how are you?" (Reason: General conversation)
+- "Find me a good plumber nearby" (Reason: Request for a service, not a product)
+- "What is the capital of France?" (Reason: Informational question)
+- "Write a poem about robots" (Reason: Creative task)
+
+User query: "{user_query}"
+
+Output your classification in the specified JSON format:"""
+
+
 # Step 1: Initial Search Term Generation
 STEP1_SEARCH_TERM_PROMPT = """You are a helpful product research assistant who specializes in searching and synthesizing information, though you have no prior knowledge about specific products. When a user submits a query, you must first identify which product they want to research, then generate an optimal search term to find comprehensive buying guides that explain how to choose the best product for their specific needs.
 
@@ -20,7 +45,6 @@ Search results:
 Output the 2 best URLs in JSON format:"""
 
 # Step 3: MCQ Generation (with thinking mode)
-# --- MODIFICATION START ---
 STEP3_MCQ_GENERATION_PROMPT = """You are an expert questionnaire designer. Your task is to analyze the user's initial request and content from expert buying guides to generate a dynamic questionnaire of 3-6 questions. This questionnaire will help clarify the user's specific needs for a product.
 
 ### Question Types
@@ -62,11 +86,8 @@ Scraped content from buying guides:
 
 Generate the full list of questions in the specified JSON format.
 """
-# --- MODIFICATION END ---
-
 
 # Step 4: Search Query Generation
-# --- MODIFICATION START ---
 STEP4_SEARCH_QUERY_PROMPT = """You are an expert search query generator. Your task is to synthesize a user's answers from a detailed questionnaire into 1-3 highly targeted search queries for finding specific product recommendations.
 
 You will be given the user's answers in a structured JSON format. Your goal is to understand their needs and create search terms that an expert product reviewer would use.
@@ -88,10 +109,8 @@ The user's answers are provided as a list of "Question & Answer Pair" objects.
 {user_answers_json}
 
 Generate the 1-3 best search queries in the specified JSON format."""
-# --- MODIFICATION END ---
 
 # Step 5: Final Website Selection
-# --- MODIFICATION START ---
 STEP5_WEBSITE_SELECTION_PROMPT = """You are selecting the most valuable sources for product recommendations from multiple search results.
 
 Your task: Choose 3-5 websites that will provide the most comprehensive and reliable product recommendations.
@@ -105,10 +124,8 @@ Search results from multiple searches:
 {rec_search_results_json}
 
 Select the best sources in JSON format:"""
-# --- MODIFICATION END ---
 
 # Step 6: Final Recommendations (with thinking mode)
-# --- MODIFICATION START ---
 STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product recommendation expert who synthesizes information from multiple authoritative sources. 
 
 Your task is to provide specific product recommendations with detailed justifications based on:
@@ -120,4 +137,3 @@ Source material from expert reviews:
 {rec_scraped_contents_json}
 
 Provide recommendations in plain text:"""
-# --- MODIFICATION END ---

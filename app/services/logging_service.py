@@ -94,6 +94,41 @@ def _save_history_to_firestore(full_trace: dict):
     except Exception as e:
         print(f"ERROR: Failed to save history to Firestore for conv_id {conversation_id}: {e}")
 
+def save_rejected_query(rejection_data: dict):
+    """
+    Saves a record of a rejected query to a dedicated location in GCS.
+
+    Args:
+        rejection_data (dict): A dictionary containing details of the rejection.
+    """
+    if not gcs_bucket:
+        print("Skipping rejection logging because GCS client is not initialized.")
+        return
+
+    try:
+        conversation_id = rejection_data.get("conversationId", "unknown-id")
+        user_id = rejection_data.get("userId", "unknown-user")
+        
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        year = now_utc.strftime("%Y")
+        month = now_utc.strftime("%m")
+        day = now_utc.strftime("%d")
+
+        # Use a different subfolder for rejected queries
+        gcs_path = f"rejected_queries/{year}/{month}/{day}/{user_id}/{conversation_id}.json"
+        
+        blob = gcs_bucket.blob(gcs_path)
+        
+        # Add a server timestamp to the log
+        rejection_data["rejectedAt"] = now_utc.isoformat()
+
+        log_json = json.dumps(rejection_data, indent=2, ensure_ascii=False)
+        blob.upload_from_string(log_json, content_type="application/json")
+        
+        print(f"Successfully saved rejected query log for conv_id {conversation_id} to GCS at {gcs_path}")
+
+    except Exception as e:
+        print(f"ERROR: Failed to save rejected query log to GCS for conv_id {rejection_data.get('conversationId')}: {e}")
 
 def save_completed_conversation(full_trace: dict):
     """

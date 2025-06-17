@@ -64,7 +64,6 @@ class FinalizeRequest(BaseModel):
 
 # --- Response Models ---
 
-# --- MODIFICATION START ---
 class QuestionOption(BaseModel):
     """Data model for a single MCQ option. The client is responsible for assigning letters (A, B, C) or numbers."""
     text: str
@@ -80,7 +79,6 @@ class Question(BaseModel):
     is_other: Optional[bool] = Field(None, alias="isOther", description="For single/multi questions, true if a free-text 'Other' option is appropriate.")
     min: Optional[float] = None
     max: Optional[float] = None
-# --- MODIFICATION END ---
 
 class QuestionsResponse(BaseModel):
     """Data model for the /start endpoint response body."""
@@ -95,10 +93,38 @@ class StopResponse(BaseModel):
     status: str = Field(..., example="stopped")
     message: str = Field(..., example="Your session has been terminated.")
 
+# --- MODIFICATION START ---
+class RejectionResponse(BaseModel):
+    """
+    Data model for the structured rejection response sent to the client
+    when the user's query is out-of-scope.
+    """
+    message: str = "Query cannot be processed."
+    reason: str
+
+# --- MODIFICATION END ---
 
 # ==============================================================================
 # Internal OpenAPI Schemas for Gemini Interactions
 # ==============================================================================
+
+# --- MODIFICATION START ---
+# Step 0: Guardrail for Intent Classification
+GUARDRAIL_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "is_product_request": {
+            "type": "boolean",
+            "description": "True if the query is a request for a physical product, otherwise False."
+        },
+        "reason": {
+            "type": "string",
+            "description": "A brief, user-facing explanation for why the query was rejected."
+        }
+    },
+    "required": ["is_product_request", "reason"]
+}
+# --- MODIFICATION END ---
 
 # Step 1: Initial Search Term Generation
 GUIDE_SEARCH_TERM_SCHEMA = {
@@ -127,7 +153,6 @@ GUIDE_SEARCH_URLS_SCHEMA = {
 
 
 # Step 3: MCQ Generation
-# --- MODIFICATION START ---
 MCQ_QUESTIONS_SCHEMA = {
     "type": "object",
     "properties": {
@@ -176,7 +201,6 @@ MCQ_QUESTIONS_SCHEMA = {
     },
     "required": ["questions"]
 }
-# --- MODIFICATION END ---
 
 
 # Step 4: Search Query Generation
