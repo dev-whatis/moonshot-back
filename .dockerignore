@@ -1,0 +1,55 @@
+# ==============================================================================
+# .dockerignore
+#
+# This file lists files and directories that should be excluded from the
+# Docker build context to keep it small and secure.
+# ==============================================================================
+
+# --- Secrets ---
+# Crucially, ignore the .env file containing API keys.
+.env
+
+# Ignore the local copy of the service account key.
+# This should be managed by a secret manager in production.
+firebase-service-account.json
+
+
+# --- Python ---
+# Ignore virtual environment directories.
+# The container will build its own environment.
+.venv
+venv
+env
+
+# Ignore Python bytecode and cache.
+__pycache__/
+*.pyc
+
+
+# --- Version Control ---
+# Ignore the Git directory and related files.
+.git/
+.gitignore
+
+
+# --- Docker ---
+# Ignore the Dockerfile and this .dockerignore file itself.
+Dockerfile
+.dockerignore
+
+
+# --- IDE / Editor Configuration ---
+# Ignore configuration directories for common editors.
+.vscode/
+.idea/
+
+
+# --- OS-specific files ---
+# Ignore macOS specific files.
+.DS_Store
+
+# ___ Helper Files ---
+# Ignore any helper scripts or files that are not needed in the container.
+fetchtoken.py
+readme.md
+user_detail_fetcher.py

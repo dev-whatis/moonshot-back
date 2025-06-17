@@ -1,0 +1,13 @@
+# Byte-compiled / optimized Python files
+__pycache__/
+*.py[cod]
+
+# Environment vars
+.env
+
+# Firebase service account
+firebase-service-account.json
+
+# macOS
+.DS_Store
+
