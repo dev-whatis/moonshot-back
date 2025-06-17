@@ -67,7 +67,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",        # local dev
+        "http://localhost:5173",        # local dev url
+        "https://www.recmonkey.com"    # website url
     ],
     allow_origin_regex=r"^https://[A-Za-z0-9-]+\.moonshot-front-f4u\.pages\.dev$",
     allow_credentials=True,
