@@ -40,11 +40,13 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY", "your_serper_api_key_here")
 # --- Gemini API Configuration ---
 # This is a secret and should be set in your .env file
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your_gemini_api_key_here")
-MODEL_NAME = "gemini-2.5-flash-preview-05-20"
+MODEL_NAME = "gemini-2.5-flash"
+GUARDRAIL_MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"
 
 # --- Model Configuration ---
 DEFAULT_TEMPERATURE = 0.7
 MAX_TOKENS = 8192
+THINKING_BUDGET = -1
 
 # --- Google Cloud Project Configuration ---
 # Your Google Cloud Project ID
@@ -52,15 +54,6 @@ GCP_PROJECT_ID = "moonshot-69420"
 # The name of the GCS bucket for storing raw trace logs
 GCS_BUCKET_NAME = "moonshot-69420-llm-traces"
 
-# --- Application Settings ---
-# These settings can be used to add validation in the future if needed.
-MAX_GUIDE_URLS = 2
-MIN_MCQ_QUESTIONS = 3
-MAX_MCQ_QUESTIONS = 6
-MIN_REC_SEARCH_TERMS = 1
-MAX_REC_SEARCH_TERMS = 3
-MIN_REC_URLS = 3
-MAX_REC_URLS = 5
 # Maximum number of concurrent requests for parallel scraping/searching
 MAX_CONCURRENT_REQUESTS = 5
 

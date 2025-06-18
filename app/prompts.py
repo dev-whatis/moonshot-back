@@ -27,25 +27,13 @@ User query: "{user_query}"
 Output your classification in the specified JSON format:"""
 
 
-# Step 1: Initial Search Term Generation
-STEP1_SEARCH_TERM_PROMPT = """You are a helpful product research assistant who specializes in searching and synthesizing information, though you have no prior knowledge about specific products. When a user submits a query, you must first identify which product they want to research, then generate an optimal search term to find comprehensive buying guides that explain how to choose the best product for their specific needs.
+# --- MODIFICATION START ---
+# STEP1_SEARCH_TERM_PROMPT and STEP2_LINK_SELECTION_PROMPT have been removed.
+# --- MODIFICATION END ---
 
-User query: "{user_query}"
-
-Output the search term in JSON format:"""
-
-# Step 2: Link Selection
-STEP2_LINK_SELECTION_PROMPT = """You are evaluating search results to find the most comprehensive and authoritative buying guides. 
-
-Your task: Select exactly 2 URLs (no more, no less) that are most likely to contain detailed, expert guidance on product selection criteria.
-
-Search results:
-{search_results_json}
-
-Output the 2 best URLs in JSON format:"""
 
 # Step 3: MCQ Generation (with thinking mode)
-STEP3_MCQ_GENERATION_PROMPT = """You are an expert questionnaire designer. Your task is to analyze the user's initial request and content from expert buying guides to generate a dynamic questionnaire of 3-6 questions. This questionnaire will help clarify the user's specific needs for a product.
+STEP3_MCQ_GENERATION_PROMPT = """You are an expert questionnaire designer. Your task is to analyze the user's initial request and use your internal knowledge about the product category to generate a dynamic questionnaire of 3-6 questions. This questionnaire will help clarify the user's specific needs for a product.
 
 ### Question Types
 
@@ -65,7 +53,7 @@ You must generate questions using one of three formats:
     *   **If a minimum is mentioned (e.g., "over $600"):** Set `min` to that amount and `max` to `null`. The question should be a confirmation.
 
 2.  **Content-Driven Questions:**
-    *   For all other questions (`id > 1`), derive them from the key decision-making factors found in the `scraped_contents`.
+    *   For all other questions (`id > 1`), derive them from the key decision-making factors you know are important for this product.
     *   Order these questions from most to least important.
     *   Use `type: "multi"` for questions where a user could reasonably want multiple features (e.g., "Which of these features are you interested in?"). Always include the text "select all that apply" in the question text for `multi` type questions.
     *   Use `type: "single"` for questions that require a single choice (e.g., "What is the primary use for this product?").
@@ -78,9 +66,6 @@ You must generate questions using one of three formats:
 ### Input Data
 
 User's initial query: "{user_query}"
-
-Scraped content from buying guides:
-{scraped_contents}
 
 ### Output Command
 

@@ -1,13 +1,10 @@
 """
 (search_functions.py) Search and scraping functions using Serper API
 """
-# --- MODIFICATION START ---
 import httpx
 from concurrent.futures import ThreadPoolExecutor
 from app.config import SERPER_API_KEY, MAX_CONCURRENT_REQUESTS
-# --- MODIFICATION END ---
 
-# --- MODIFICATION START ---
 # Refactored to use the httpx library for cleaner and more robust HTTP requests.
 def _search_google(query: str) -> list:
     """
@@ -70,56 +67,14 @@ def _scrape_url(url: str) -> str:
     except Exception as e:
         print(f"An unexpected error occurred while scraping URL {url}: {e}")
         return ""
+
+# --- MODIFICATION START ---
+# The following functions related to the buying guide search/scrape phase have been removed:
+# - search_buying_guides
+# - _scrape_single_guide_url
+# - scrape_guide_urls
 # --- MODIFICATION END ---
 
-def search_buying_guides(guide_search_term: str) -> dict:
-    """
-    Step 1.5: Search for buying guides using the guide search term.
-    
-    Args:
-        guide_search_term (str): Search term for finding buying guides.
-    
-    Returns:
-        dict: Search results in JSON format with organic results.
-    """
-    print(f"Searching for buying guides with term: {guide_search_term}")
-    
-    organic_results = _search_google(guide_search_term)
-    
-    return {"results": organic_results}
-
-def _scrape_single_guide_url(url: str) -> str:
-    """Helper function for parallel scraping of guide URLs."""
-    print(f"Scraping: {url}")
-    scraped_text = _scrape_url(url)
-    
-    if scraped_text:
-        return f"\n\n--- Content from {url} ---\n\n{scraped_text}"
-    else:
-        print(f"Failed to scrape content from {url}")
-        return ""
-
-def scrape_guide_urls(guide_search_urls: list) -> str:
-    """
-    Step 2.5: Scrape content from selected buying guide URLs (PARALLELIZED).
-    
-    Args:
-        guide_search_urls (list): List of URLs to scrape.
-    
-    Returns:
-        str: Combined scraped content from the URLs.
-    """
-    print(f"Scraping guide URLs: {guide_search_urls}")
-    
-    # --- MODIFICATION START ---
-    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
-    # --- MODIFICATION END ---
-        # Process all URLs in parallel
-        scraped_contents = list(executor.map(_scrape_single_guide_url, guide_search_urls))
-    
-    # Combine all content
-    combined_content = "".join(content for content in scraped_contents if content)
-    return combined_content.strip()
 
 def _search_single_recommendation(query: str) -> dict:
     """Helper function for parallel product recommendation searching."""
@@ -143,9 +98,7 @@ def search_product_recommendations(rec_search_terms: list) -> list:
     """
     print(f"Searching for product recommendations with terms: {rec_search_terms}")
     
-    # --- MODIFICATION START ---
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
-    # --- MODIFICATION END ---
         # Process all search terms in parallel
         results = list(executor.map(_search_single_recommendation, rec_search_terms))
     
@@ -177,9 +130,7 @@ def scrape_recommendation_urls(rec_search_urls: list) -> list:
     """
     print(f"Scraping recommendation URLs: {[url_obj['url'] for url_obj in rec_search_urls]}")
     
-    # --- MODIFICATION START ---
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
-    # --- MODIFICATION END ---
         # Process all URLs in parallel
         scraped_contents = list(executor.map(_scrape_single_recommendation_url, rec_search_urls))
     

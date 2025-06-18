@@ -93,7 +93,6 @@ class StopResponse(BaseModel):
     status: str = Field(..., example="stopped")
     message: str = Field(..., example="Your session has been terminated.")
 
-# --- MODIFICATION START ---
 class RejectionResponse(BaseModel):
     """
     Data model for the structured rejection response sent to the client
@@ -102,13 +101,11 @@ class RejectionResponse(BaseModel):
     message: str = "Query cannot be processed."
     reason: str
 
-# --- MODIFICATION END ---
 
 # ==============================================================================
 # Internal OpenAPI Schemas for Gemini Interactions
 # ==============================================================================
 
-# --- MODIFICATION START ---
 # Step 0: Guardrail for Intent Classification
 GUARDRAIL_RESPONSE_SCHEMA = {
     "type": "object",
@@ -124,32 +121,11 @@ GUARDRAIL_RESPONSE_SCHEMA = {
     },
     "required": ["is_product_request", "reason"]
 }
+
+# --- MODIFICATION START ---
+# Schemas for Step 1 (GUIDE_SEARCH_TERM_SCHEMA) and Step 2 (GUIDE_SEARCH_URLS_SCHEMA)
+# have been removed as they are no longer in use.
 # --- MODIFICATION END ---
-
-# Step 1: Initial Search Term Generation
-GUIDE_SEARCH_TERM_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "guide_search_term": {
-            "type": "string"
-        }
-    },
-    "required": ["guide_search_term"]
-}
-
-# Step 2: Link Selection
-GUIDE_SEARCH_URLS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "guide_search_urls": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        }
-    },
-    "required": ["guide_search_urls"]
-}
 
 
 # Step 3: MCQ Generation
