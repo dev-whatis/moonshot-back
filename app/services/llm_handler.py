@@ -165,14 +165,39 @@ class LLMHandler:
     def generate_final_recommendations(self, rec_scraped_contents: list) -> str:
         """
         Step 6: Generate final product recommendations (with thinking mode).
+        This includes a fail-safe to handle cases where the LLM wraps the
+        Markdown output in a single-key JSON object.
 
         Args:
             rec_scraped_contents (list): Scraped content from recommendation URLs.
 
         Returns:
-            str: Final recommendations in plain text.
+            str: Final recommendations in Markdown format.
         """
         prompt = STEP6_FINAL_RECOMMENDATIONS_PROMPT.format(
             rec_scraped_contents_json=json.dumps(rec_scraped_contents, indent=2)
         )
-        return self._send_message_text_only(prompt, use_thinking=True)
+        # Get the raw text response from the LLM
+        raw_response_text = self._send_message_text_only(prompt, use_thinking=True)
+
+        # --- MODIFICATION START ---
+        # Fail-safe to extract content if the LLM returns a JSON object
+        try:
+            # Attempt to parse the response as JSON
+            data = json.loads(raw_response_text)
+            
+            # Check if it's a dictionary with at least one key
+            if isinstance(data, dict) and data:
+                # Extract the value of the first key, regardless of the key's name
+                print("INFO: LLM returned JSON for final recommendation. Extracting content.")
+                return str(list(data.values())[0])
+            else:
+                # It's valid JSON but not the expected format (e.g., a list or empty dict)
+                # Fallback to returning the raw text
+                return raw_response_text
+                
+        except json.JSONDecodeError:
+            # This is the expected case: the response is plain text/Markdown
+            print("INFO: LLM returned plain text for final recommendation as expected.")
+            return raw_response_text
+        # --- MODIFICATION END ---

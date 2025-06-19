@@ -211,7 +211,11 @@ STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product analyst and recommenda
 2.  **User-Centric Analysis:** Your entire report must be framed around the `User Profile`. Continuously explain *why* a product feature is relevant to *that specific user*.
 3.  **Honest Assessment:** If the provided data shows that no products meet the user's critical, non-negotiable requirements, you MUST NOT recommend anything. Instead, you will use the "No Direct Match Found" format specified below.
 4.  **Acknowledge Uncertainty:** If the reviews lack information on a key user priority, you must explicitly state that this information was not available in the sources provided. This builds credibility.
-5.  **Strict Markdown Output:** Your entire response must be a single, complete document formatted in strict Markdown. Use headings (`##`, `###`), bold (`**text**`), italics (`*text*`), and bulleted lists (`-`) as specified in the structures below. This output is designed to be directly rendered by a `ReactMarkdown` component, so adherence to clean Markdown syntax is critical. Do not include any preambles or conversational text outside of the report.
+5.  **Strict Markdown Output:** Your entire response MUST be a single, complete document formatted in strict, raw Markdown.
+    -   Use headings (`##`, `###`), bold (`**text**`), italics (`*text*`), and bulleted lists (`-`) as specified in the structures below.
+    -   This output will be directly rendered by a `ReactMarkdown` component, so adherence to clean Markdown syntax is critical.
+    -   **Crucially: Do NOT wrap your response in JSON, code fences (```), or any other formatting.** Your response should start directly with the `## Executive Summary` heading.
+    -   Do not include any preambles, apologies, or conversational text outside of the report itself.
 
 ---
 
@@ -298,4 +302,8 @@ First, analyze if any products in the `Expert Review Data` meet the user's core,
 -   **Instructions:**
     -   Briefly summarize the core choice the user faces (e.g., "Your decision comes down to the all-around excellence of the Dell XPS 13 versus the superior performance of the MacBook Air, should you choose to stretch your budget.").
     -   End with a concluding statement that reinforces the report's purpose of enabling an informed choice.
+
+---
+
+**FINAL INSTRUCTION: Generate the report now. Your entire output must be raw Markdown text, starting with the `## Executive Summary` heading. Do not use JSON or code fences.**
 """
