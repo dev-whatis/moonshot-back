@@ -73,42 +73,27 @@ Generate the full list of questions in the specified JSON format.
 """
 
 # Step 4: Search Query Generation
-STEP4_SEARCH_QUERY_PROMPT = """You are a master search strategist for a product recommendation engine. Your goal is to construct a strategic PORTFOLIO of 3-5 queries. This portfolio must work together to gather comprehensive, multi-faceted data to identify direct matches, uncover potential trade-offs, and explore key user priorities in depth.
+STEP4_SEARCH_QUERY_PROMPT = """You are an expert search query generator. Your task is to synthesize a user's answers from a detailed questionnaire into 1-3 highly targeted search queries for finding specific product recommendations.
 
-### The Menu of Strategic Query Types
+You will be given the user's answers in a structured JSON format. Your goal is to understand their needs and create search terms that an expert product reviewer would use.
 
-Construct your portfolio by selecting a combination of 3-5 of the most relevant query types from the menu below. The **Core Request** is almost always mandatory.
+### Input Format
 
-1.  **The Core Request (The Bullseye):**
-    *   **Purpose:** To find products that are a direct match for the user's most critical, non-negotiable requirements.
-    *   **Method:** Combine the most important criteria (e.g., Primary Use, Budget, a must-have feature) into one highly-targeted query.
+The user's answers are provided as a list of "Question & Answer Pair" objects.
 
-2.  **The Trade-Off Exploration:**
-    *   **Purpose:** To find "Strategic Alternatives" by exploring what the user could get if they compromised on one key factor.
-    *   **Method:** Create a query that intentionally relaxes a major constraint (e.g., `budget under $1000` -> `under $1300`) or focuses on a competing priority (e.g., `lightweight gaming laptop` -> `best performance gaming laptop`).
+### Your Task & Instructions
 
-3.  **The Feature Deep-Dive:**
-    *   **Purpose:** To find expert content focused on a single, crucial feature the user has identified as a high priority.
-    *   **Method:** Formulate a query that isolates one specific feature. (e.g., "laptops with best keyboards 2024", "headphones with best microphone for calls 2024").
-
-4.  **The Problem-Oriented Search:**
-    *   **Purpose:** To find content that speaks to the user's underlying problem or pain point, using natural language.
-    *   **Method:** Frame a query around the solution to a problem. (e.g., "laptops that don't overheat during long sessions", "quietest mechanical keyboards for office use").
-
-5.  **The Market Context Search:**
-    *   **Purpose:** To provide a baseline of what the market considers "best in class" for the general product category.
-    *   **Method:** Use a more general query focusing on the primary use case or category. (e.g., "best laptops for college students 2024").
+1.  **Analyze Holistically:** Read through all the question-answer pairs to get a complete picture of the user's request.
+2.  **Prioritize Key Factors:** Identify the most important criteria. The budget is almost always a critical factor.
+3.  **Create Natural Queries:** Combine the criteria into natural search queries.
+4.  **Handle "isOther":** Pay close attention to answers where `isOther` is `true`. These custom answers are very important signals of the user's specific needs.
+5.  **Be Specific:** The more details you can include (without making the query nonsensical), the better the search results will be.
+6.  **Include the Year:** Always add the current year ({current_year}) to your queries to find the most recent reviews and products.
 
 ### User's Actual Answers:
 {user_answers_json}
-    
-### Instructions & Output Format
 
-1.  **Analyze Holistically:** Review all user answers to identify the primary goal, hard constraints, and secondary priorities.
-2.  **Formulate a Strategy (Internal Thought Process):** Mentally formulate a strategy by selecting 3-5 query types from the menu that best suit the user's request. **This thinking process is for your internal guidance and MUST NOT be included in the final output.**
-3.  **Construct the Queries:** Based on your strategy, create your 3-5 queries. Always include the current year ({current_year}) to get recent results.
-
-Generate the 3-5 best search queries in the specified JSON format."""
+Generate the 1-3 best search queries in the specified JSON format."""
 
 # Step 5: Final Website Selection
 STEP5_WEBSITE_SELECTION_PROMPT = """You are selecting the most valuable sources for product recommendations from multiple search results.
@@ -134,6 +119,7 @@ STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product analyst and recommenda
 2.  **User-Centric Analysis:** Your entire report must be framed around the `User Profile`. Continuously explain *why* a product feature is relevant to *that specific user*.
 3.  **Honest Assessment:** If the provided data shows that no products meet the user's critical, non-negotiable requirements, you MUST NOT recommend anything. Instead, you will use the "No Direct Match Found" format specified below.
 4.  **Acknowledge Uncertainty:** If the reviews lack information on a key user priority, you must explicitly state that this information was not available in the sources provided. This builds credibility.
+5.  **Strict Markdown Output:** Your entire response must be a single, complete document formatted in strict Markdown. Use headings (`##`, `###`), bold (`**text**`), italics (`*text*`), and bulleted lists (`-`) as specified in the structures below. This output is designed to be directly rendered by a `ReactMarkdown` component, so adherence to clean Markdown syntax is critical. Do not include any preambles or conversational text outside of the report.
 
 ---
 
@@ -194,7 +180,7 @@ First, analyze if any products in the `Expert Review Data` meet the user's core,
     -   Write a detailed paragraph explaining *why this is a top recommendation for this user*.
     -   Use **bolding** to highlight the specific features that directly address the user's main priorities.
     -   **Crucially, cite your evidence.** Paraphrase specific findings from the `Expert Review Data` to support your claims. (e.g., "Its build quality is a standout, with reviews consistently praising its **sturdy aluminum and carbon fiber chassis**.").
-    -   Include a "Noteworthy Considerations" bullet point to mention any minor drawbacks or information gaps from the reviews. (e.g., "*Noteworthy Considerations:* While performance is strong, reviews point out the limited port selection. Information on webcam quality was not consistently available in the sources.")
+    -   Include a "Noteworthy Considerations" bullet point to mention any minor drawbacks or information gaps from the reviews. (e.g., "*Noteworthy Considerations:* While performance is strong, a few reviews point out the limited port selection. Information on webcam quality was not consistently available in the sources.")
 
 ---
 
