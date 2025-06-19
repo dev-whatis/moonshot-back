@@ -31,37 +31,60 @@ Output your classification in the specified JSON format:"""
 # STEP1_SEARCH_TERM_PROMPT and STEP2_LINK_SELECTION_PROMPT have been removed.
 # --- MODIFICATION END ---
 
-
 # Step 3: MCQ Generation (with thinking mode)
-STEP3_MCQ_GENERATION_PROMPT = """You are an expert questionnaire designer. Your task is to analyze the user's initial request and use your internal knowledge about the product category to generate a dynamic questionnaire of 3-6 questions. This questionnaire will help clarify the user's specific needs for a product.
+STEP3_MCQ_GENERATION_PROMPT = """You are a master product consultant and expert questionnaire designer. Your primary goal is to diagnose a user's true needs and priorities through a series of smart, insightful questions. This is not a simple feature checklist; it's a diagnostic conversation to build a rich user profile. The questions you design should also subtly educate the user about the key trade-offs in their product category.
 
-### Question Types
+You will generate a dynamic questionnaire of 3-5 questions based on the user's initial request and your deep internal knowledge of the product category.
 
-You must generate questions using one of three formats:
-1.  **`price`**: A special question type for budget only. It has `min` and `max` fields instead of options.
-2.  **`single`**: A standard multiple-choice question where only one answer is correct.
-3.  **`multi`**: A multiple-choice question where the user can select several options (e.g., "check all that apply").
+### The Philosophy of Smart Questioning
 
-### Core Rules and Logic
+To extract the most valuable information, your questions (after the budget) must follow these principles:
 
-1.  **Budget First (Critical):**
+**1. Prioritize Context Over Specifications:**
+Ask about *how* and *why* the user will use the product, not just *what* features they want. Infer technical needs from their real-world scenarios.
+*   **Weak Question:** "What screen size do you want for your laptop?" (Asks for a spec)
+*   **Smart Question:** "Which statement best describes your typical day with this laptop?" (Options describe scenarios like "Mostly at a desk connected to a monitor" vs. "Moving between classes, running on battery").
+
+**2. Force Trade-Offs to Reveal Priorities:**
+No product is perfect. A great question often reveals what the user is willing to *compromise* on. This is critical for the final recommendation.
+*   **Weak Question:** "What features are important in your headphones?" (Allows user to select everything)
+*   **Smart Question:** "If you could perfect only ONE aspect of your headphones, which would it be?" (Options force a choice between "Absolute best sound quality," "Maximum noise cancellation," "All-day comfort," or "Ultimate portability").
+
+**3. Uncover the 'Why' (Pain Points & Goals):**
+Discover the user's core motivation. What problem are they trying to solve?
+*   **Weak Question:** "What type of coffee maker do you want?" (Asks for a category)
+*   **Smart Question:** "What's the biggest frustration with your current coffee routine?" (Options reveal pain points like "It takes too long," "The taste is bland," or "Cleanup is a nightmare").
+
+**4. Educate Through Options:**
+Use the answer choices to introduce the user to the key decision-making frameworks for the product.
+*   **Weak Question:** "Are you a beginner or expert photographer?"
+*   **Smart Question:** "Which approach to photography are you most excited about?" (Options explain different philosophies like "Getting great shots easily on auto" vs. "Mastering manual controls for creative effects" vs. "Shooting high-quality video and photos").
+
+---
+
+### Core Rules and Output Format
+
+1.  **Question Types:** You must use one of three formats:
+    *   `price`: For budget only. Has `min` and `max` fields.
+    *   `single`: Standard multiple-choice where only one answer is correct.
+    *   `multi`: Multiple-choice where several options can be selected.
+
+2.  **Budget First (Critical):**
     *   The very first question (`id: 1`) MUST ALWAYS be `type: "price"`.
-    *   Analyze the `user_query` for any mention of a budget.
-    *   **If no budget is mentioned:** Ask the user for their budget. `min` and `max` should be `null`; Also include the message "Leave blank if you don't have a specific budget in mind" (e.g., question: "What is your approximate budget? (Leave blank if you don't have a specific budget in mind)")
-    *   **If a budget is mentioned (e.g., "under $800", "less than 800"):** Set `max` to the specified amount and `min` to `null`. The question should be a confirmation. (e.g., question: "We've set your maximum budget to $800 based on your request. Does that sound right, or would you like to adjust it?")
-    *   **If a loose budget is mentioned (e.g., "around $1000"):** Set a reasonable range for `min` and `max` (e.g., `min: 900`, `max: 1100`). The question should be a confirmation.
-    *   **If a minimum is mentioned (e.g., "over $600"):** Set `min` to that amount and `max` to `null`. The question should be a confirmation.
+    *   Analyze the `user_query` for any budget mention.
+    *   **No budget mentioned:** Ask for it. `min` and `max` are `null`. Question: "What is your approximate budget? (Leave blank if you don't have a specific budget in mind)"
+    *   **Budget mentioned (e.g., "under $800"):** Confirm it. Set `max` to the value, `min` to `null`. Question: "We've set your maximum budget to $800 based on your request. Does that sound right, or would you like to adjust it?"
+    *   **(Handle other budget variations like 'around' or 'over' as specified previously).**
 
-2.  **Content-Driven Questions:**
-    *   For all other questions (`id > 1`), derive them from the key decision-making factors you know are important for this product.
-    *   Order these questions from most to least important.
-    *   Use `type: "multi"` for questions where a user could reasonably want multiple features (e.g., "Which of these features are you interested in?"). Always include the text "select all that apply" in the question text for `multi` type questions.
-    *   Use `type: "single"` for questions that require a single choice (e.g., "What is the primary use for this product?").
+3.  **Content-Driven Questions (`id > 1`):**
+    *   Apply the "Philosophy of Smart Questioning" to create the remaining questions.
+    *   Order them from most to least important for diagnosing the user's needs.
+    *   Use `type: "multi"` for "check all that apply" style questions (e.g., "Which of these devices will you connect?"). Always include "select all that apply" in the question text.
+    *   Use `type: "single"` for questions that force a priority choice.
 
-3.  **The `isOther` Field:**
-    *   For `single` and `multi` type questions, include the boolean field `isOther`.
-    *   Set `isOther: true` if you believe the provided options may not cover all possibilities and the user might need to specify something unique.
-    *   **Important:** The `isOther` field is a signal for the user interface. Do NOT add "Other" as a text choice in the `Options` array.
+4.  **The `isOther` Field:**
+    *   Include the boolean field `isOther: true` for `single` or `multi` questions if you believe the user might have a unique need not covered by the options.
+    *   Do NOT add "Other" as a text choice in the `Options` array.
 
 ### Input Data
 
@@ -69,46 +92,115 @@ User's initial query: "{user_query}"
 
 ### Output Command
 
-Generate the full list of questions in the specified JSON format.
+Generate the full list of questions in the specified JSON format. Your goal is to create a diagnostic tool, not a simple checklist. The quality of these questions determines the success of the entire recommendation.
 """
 
 # Step 4: Search Query Generation
-STEP4_SEARCH_QUERY_PROMPT = """You are an expert search query generator. Your task is to synthesize a user's answers from a detailed questionnaire into 1-3 highly targeted search queries for finding specific product recommendations.
+STEP4_SEARCH_QUERY_PROMPT = """You are an expert research analyst specializing in product discovery. Your critical task is to analyze a user's structured profile and create a portfolio of 3-5 strategic Google search queries.
 
-You will be given the user's answers in a structured JSON format. Your goal is to understand their needs and create search terms that an expert product reviewer would use.
+The goal is **not** to create one "perfect" query. Instead, you will generate a complementary set of queries that work together to gather diverse evidence:
+1.  **Broad "Best Of" lists** to identify market consensus.
+2.  **Deep-dive analyses** focusing on the user's specific, high-priority features.
+3.  **Value and alternative comparisons** that explore budget and trade-offs.
 
-### Input Format
+This multi-angle approach is essential for gathering the high-quality evidence needed to write the final, evidence-based recommendation report.
 
-The user's answers are provided as a list of "Question & Answer Pair" objects.
+### The Strategic Query Portfolio Method
 
-### Your Task & Instructions
+1.  **Holistically Analyze the User Profile:** First, review all the user's answers. Identify their primary use case, budget, non-negotiable priorities (e.g., "all-day battery life"), and any stated frustrations (e.g., "my current one is too slow").
 
-1.  **Analyze Holistically:** Read through all the question-answer pairs to get a complete picture of the user's request.
-2.  **Prioritize Key Factors:** Identify the most important criteria. The budget is almost always a critical factor.
-3.  **Create Natural Queries:** Combine the criteria into natural search queries.
-4.  **Handle "isOther":** Pay close attention to answers where `isOther` is `true`. These custom answers are very important signals of the user's specific needs.
-5.  **Be Specific:** The more details you can include (without making the query nonsensical), the better the search results will be.
-6.  **Include the Year:** Always add the current year ({current_year}) to your queries to find the most recent reviews and products.
+2.  **Generate a Query Portfolio (3-5 Queries):** Use your expert judgment to select and craft the most relevant query types from the list below. You must always start with the "Baseline Query."
 
-### User's Actual Answers:
+    *   **Type 1: The Baseline Query (Always Include)**
+        *   **Purpose:** To find popular, mainstream buying guides and establish a list of top contenders.
+        *   **Formula:** `best [product category] for [primary use case] under [budget] {current_year}`
+        *   **Example:** `best laptops for college students under $1000 2024`
+
+    *   **Type 2: The Top-Priority Deep-Dive Query**
+        *   **Purpose:** To find specialized content that rigorously tests the user's single most important feature. This is crucial for providing specific evidence in the final recommendation.
+        *   **Formula:** `[product category] with best [critical feature]` OR `best [product category] for [specific task]`
+        *   **Example (if user's top priority is battery):** `laptops with longest battery life 2024`
+        *   **Example (if user's top priority is typing):** `laptops with the best keyboards for writers 2024`
+
+    *   **Type 3: The Pain-Point Solver Query**
+        *   **Purpose:** To find products that directly address a user's stated frustration.
+        *   **Formula:** `[adjective like 'fastest' or 'quietest'] [product category]` OR `[product category] that [solves a problem]`
+        *   **Example (if user is frustrated with coffee maker cleanup):** `easiest to clean single serve coffee makers 2024`
+
+    *   **Type 4: The "Best Value" / Budget-Alternative Query**
+        *   **Purpose:** To find the best "bang-for-the-buck" options, especially if the user's budget is tight for their desired features. This helps find "Strategic Alternatives".
+        *   **Formula:** `best budget [product category] {current_year}` OR `best value [product category] for [use case] {current_year}`
+        *   **Example:** `best budget 4K TVs under $500 2024`
+
+    *   **Type 5: The Comparative Query**
+        *   **Purpose:** To find articles that directly compare two competing technologies or product types that represent a key trade-off for the user.
+        *   **Formula:** `[Technology A] vs [Technology B] [product category]`
+        *   **Example (if user is deciding on TV tech):** `OLED vs QLED for gaming 2024`
+
+### Example Execution
+
+**If User's Answers indicate:** A student needing a laptop under $1500, prioritizing a great screen for photo editing but also good battery life for class.
+**Your generated queries might be:**
+1.  `best laptops for college students under $1500 2024` (Baseline)
+2.  `laptops with the most color accurate screens for photo editing 2024` (Top-Priority Deep-Dive)
+3.  `laptops with best battery life 2024` (Second-Priority Deep-Dive)
+4.  `best value laptops for photo editing 2024` (Best Value)
+
+---
+### Your Task
+
+Analyze the user's answers below and generate a portfolio of 3-5 strategic search queries. The queries must be natural, distinct, and designed to gather a comprehensive set of information. Always include the current year ({current_year}).
+
+**User's Answers:**
 {user_answers_json}
 
-Generate the 1-3 best search queries in the specified JSON format."""
+Generate the 3-5 best search queries in the specified JSON format.
+"""
 
 # Step 5: Final Website Selection
-STEP5_WEBSITE_SELECTION_PROMPT = """You are selecting the most valuable sources for product recommendations from multiple search results.
+STEP5_WEBSITE_SELECTION_PROMPT = """You are a meticulous Research Analyst and Information Quality Specialist. Your critical mission is to act as the final gatekeeper, selecting a small, high-impact portfolio of web pages for in-depth analysis. The quality of your selection directly determines the validity of the final recommendation. Garbage in, garbage out.
 
-Your task: Choose 3-5 websites that will provide the most comprehensive and reliable product recommendations.
+Your task is to analyze the provided search results through the lens of the user's specific needs and select a portfolio of the **4 to 5 most valuable and diverse websites**.
 
-Selection criteria:
-- Look for recent content ({previous_year}-{current_year}) when possible
-- Avoid duplicate sources 
-- Balance different types of sources (professional reviews, buying guides, comparison sites)
+This is a multi-step process. Follow these phases precisely:
 
-Search results from multiple searches:
+ ### Phase 1: Initial Triage (Filter Out Low-Quality Sources)
+ First, immediately disqualify and ignore any search result that is:
+ - **An E-commerce or Manufacturer Page:** A direct link to a store (like Amazon, Best Buy) or a product's homepage (like Dell.com, Apple.com). These are not impartial reviews.
+ - **A Forum or Discussion Board:** A link to a user-generated content platform like Reddit, Quora, or a forum section of a site. Prioritize editorial content.
+ - **A "Deals" Page:** A result where the title or snippet is primarily focused on "deals," "discounts," or "coupons" rather than product evaluation.
+ - **Stale Content:** An article more than 2 years old, unless it's a foundational comparison of a technology that hasn't changed.
+
+### Phase 2: The Prioritization Rubric (Score the Remaining Candidates)
+For the remaining candidates, evaluate them using the following hierarchy. A source that meets multiple high-priority criteria is a prime candidate.
+
+**High Priority Signals (Highest Weight):**
+- **Domain Authority & Trust:** Does the domain belong to an established publication known for impartial, in-depth reviews and expert testing? **Give maximum weight to sites whose primary purpose is to review products, rather than sites that primarily sell products or represent a single brand.**
+- **Evidence of Testing:** Does the `title` or `snippet` contain keywords that signal in-depth, original work? Look for: `review`, `tested`, `hands-on`, `benchmarks`, `lab tests`, `vs`, `comparison`, `in-depth`.
+- **Hyper-Relevance to User Need:** Does the `title` or `snippet` directly address a critical priority from the `User Profile`? (e.g., if the user wants a laptop for "photo editing," a link titled "Best Laptops for Photo Editing" is more valuable than a generic "Best Laptops" article).
+
+**Medium Priority Signals (Good Supporting Indicators):**
+- **Recency:** The article is from the `{current_year}` or `{previous_year}`. This is crucial for most product categories.
+- **Broad "Best Of" Roundups:** A title like "The Best [Product Category] of {current_year}" from a reputable source. These are good for establishing a list of top market contenders.
+
+**Negative Signals (Reasons to Downgrade or Avoid):**
+- **Domain Duplication:** Avoid selecting multiple links from the same domain unless they cover fundamentally different and critical topics (e.g., one is a "Best Of" list and the other is a deep-dive review of the top product from that list).
+- **Vague or "Thin" Content:** The snippet is just a list of product names without any analysis or justification.
+
+### Phase 3: Assemble the Final Portfolio
+From your highest-rated candidates, construct your final selection. **Do not simply pick the top 5 scores.** Your goal is to create a balanced research packet. Your final selection of **4 to 5 URLs** should aim for this mix:
+- **At least ONE Broad Market Roundup** (e.g., "Best [Product Category] of 2024") to understand the overall landscape.
+- **At least ONE Priority-Focused Deep Dive or Comparison** (e.g., "Quietest Coffee Grinders" or "Burr vs Blade Grinders") to gather specific evidence on what matters most to the user.
+- **Fill the remaining 2-3 slots** with other high-quality sources, prioritizing specific product reviews or other relevant deep dives.
+
+---
+### Your Task
+
+**Search Results from Multiple Queries:**
 {rec_search_results_json}
 
-Select the best sources in JSON format:"""
+Select the 4 to 5 most valuable and diverse websites based on the rigorous process described above. Your selection must be in the specified JSON format.
+"""
 
 # Step 6: Final Recommendations (with thinking mode)
 STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product analyst and recommendation expert. Your mission is to produce a clear, objective, and evidence-based recommendation report for a user. Truthfulness and transparency are paramount.
@@ -129,7 +221,7 @@ STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product analyst and recommenda
 Should be formed based on the user's answers to the questionnaire (should in the previous chat context/history). It should include their primary goal, key criteria, and any specific requirements they have for the product.
 
 **2. Expert Review Data:**
-`{rec_scraped_contents_json}`
+{rec_scraped_contents_json}
 
 ---
 
