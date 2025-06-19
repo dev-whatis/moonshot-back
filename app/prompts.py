@@ -73,27 +73,42 @@ Generate the full list of questions in the specified JSON format.
 """
 
 # Step 4: Search Query Generation
-STEP4_SEARCH_QUERY_PROMPT = """You are an expert search query generator. Your task is to synthesize a user's answers from a detailed questionnaire into 1-3 highly targeted search queries for finding specific product recommendations.
+STEP4_SEARCH_QUERY_PROMPT = """You are a master search strategist for a product recommendation engine. Your goal is to construct a strategic PORTFOLIO of 3-5 queries. This portfolio must work together to gather comprehensive, multi-faceted data to identify direct matches, uncover potential trade-offs, and explore key user priorities in depth.
 
-You will be given the user's answers in a structured JSON format. Your goal is to understand their needs and create search terms that an expert product reviewer would use.
+### The Menu of Strategic Query Types
 
-### Input Format
+Construct your portfolio by selecting a combination of 3-5 of the most relevant query types from the menu below. The **Core Request** is almost always mandatory.
 
-The user's answers are provided as a list of "Question & Answer Pair" objects.
+1.  **The Core Request (The Bullseye):**
+    *   **Purpose:** To find products that are a direct match for the user's most critical, non-negotiable requirements.
+    *   **Method:** Combine the most important criteria (e.g., Primary Use, Budget, a must-have feature) into one highly-targeted query.
 
-### Your Task & Instructions
+2.  **The Trade-Off Exploration:**
+    *   **Purpose:** To find "Strategic Alternatives" by exploring what the user could get if they compromised on one key factor.
+    *   **Method:** Create a query that intentionally relaxes a major constraint (e.g., `budget under $1000` -> `under $1300`) or focuses on a competing priority (e.g., `lightweight gaming laptop` -> `best performance gaming laptop`).
 
-1.  **Analyze Holistically:** Read through all the question-answer pairs to get a complete picture of the user's request.
-2.  **Prioritize Key Factors:** Identify the most important criteria. The budget is almost always a critical factor.
-3.  **Create Natural Queries:** Combine the criteria into natural search queries.
-4.  **Handle "isOther":** Pay close attention to answers where `isOther` is `true`. These custom answers are very important signals of the user's specific needs.
-5.  **Be Specific:** The more details you can include (without making the query nonsensical), the better the search results will be.
-6.  **Include the Year:** Always add the current year ({current_year}) to your queries to find the most recent reviews and products.
+3.  **The Feature Deep-Dive:**
+    *   **Purpose:** To find expert content focused on a single, crucial feature the user has identified as a high priority.
+    *   **Method:** Formulate a query that isolates one specific feature. (e.g., "laptops with best keyboards 2024", "headphones with best microphone for calls 2024").
+
+4.  **The Problem-Oriented Search:**
+    *   **Purpose:** To find content that speaks to the user's underlying problem or pain point, using natural language.
+    *   **Method:** Frame a query around the solution to a problem. (e.g., "laptops that don't overheat during long sessions", "quietest mechanical keyboards for office use").
+
+5.  **The Market Context Search:**
+    *   **Purpose:** To provide a baseline of what the market considers "best in class" for the general product category.
+    *   **Method:** Use a more general query focusing on the primary use case or category. (e.g., "best laptops for college students 2024").
 
 ### User's Actual Answers:
 {user_answers_json}
+    
+### Instructions & Output Format
 
-Generate the 1-3 best search queries in the specified JSON format."""
+1.  **Analyze Holistically:** Review all user answers to identify the primary goal, hard constraints, and secondary priorities.
+2.  **Formulate a Strategy (Internal Thought Process):** Mentally formulate a strategy by selecting 3-5 query types from the menu that best suit the user's request. **This thinking process is for your internal guidance and MUST NOT be included in the final output.**
+3.  **Construct the Queries:** Based on your strategy, create your 3-5 queries. Always include the current year ({current_year}) to get recent results.
+
+Generate the 3-5 best search queries in the specified JSON format."""
 
 # Step 5: Final Website Selection
 STEP5_WEBSITE_SELECTION_PROMPT = """You are selecting the most valuable sources for product recommendations from multiple search results.
@@ -111,14 +126,98 @@ Search results from multiple searches:
 Select the best sources in JSON format:"""
 
 # Step 6: Final Recommendations (with thinking mode)
-STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product recommendation expert who synthesizes information from multiple authoritative sources. 
+STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product analyst and recommendation expert. Your mission is to produce a clear, objective, and evidence-based recommendation report for a user. Truthfulness and transparency are paramount.
 
-Your task is to provide specific product recommendations with detailed justifications based on:
-- Background information you gathered about selecting the best product
-- The user's stated needs identified through the multiple-choice questionnaire
-- Expert reviews that have been scraped and provided below
+### Core Directives:
 
-Source material from expert reviews:
-{rec_scraped_contents_json}
+1.  **Evidence is Authority:** Every claim, feature, and drawback mentioned MUST be directly traceable to the provided `Expert Review Data`. Do not invent or infer information.
+2.  **User-Centric Analysis:** Your entire report must be framed around the `User Profile`. Continuously explain *why* a product feature is relevant to *that specific user*.
+3.  **Honest Assessment:** If the provided data shows that no products meet the user's critical, non-negotiable requirements, you MUST NOT recommend anything. Instead, you will use the "No Direct Match Found" format specified below.
+4.  **Acknowledge Uncertainty:** If the reviews lack information on a key user priority, you must explicitly state that this information was not available in the sources provided. This builds credibility.
 
-Provide recommendations in plain text:"""
+---
+
+### INPUTS
+
+**1. User Profile:**
+Should be formed based on the user's answers to the questionnaire (should in the previous chat context/history). It should include their primary goal, key criteria, and any specific requirements they have for the product.
+
+**2. Expert Review Data:**
+`{rec_scraped_contents_json}`
+
+---
+
+### REPORT GENERATION LOGIC
+
+First, analyze if any products in the `Expert Review Data` meet the user's core, non-negotiable requirements from the `User Profile`.
+
+-   **IF NO**, you must generate your entire output using the **"Scenario A: No Direct Match Found"** structure.
+-   **IF YES**, you must generate your entire output using the **"Scenario B: Recommendations Report"** structure.
+
+---
+
+### Scenario A: No Direct Match Found (Output Structure)
+
+## Executive Summary: No Direct Match Found
+
+-   **Goal:** To transparently inform the user that their specific combination of needs could not be met based on the provided expert reviews, and to guide them on how to proceed.
+-   **Instructions:**
+    1.  Start with a clear statement that no products in the analyzed reviews were a direct match for their core requirements.
+    2.  In a section titled **"Analysis of Mismatch,"** explain exactly *why* no products fit. Be specific. (e.g., "The provided reviews contained no laptops with a dedicated graphics card under your specified budget of $800.")
+    3.  In a section titled **"Suggested Compromises,"** offer clear, actionable advice on what criteria they might need to adjust to find a suitable product. (e.g., "To find a laptop suitable for gaming, consider increasing your budget to the $1200-$1500 range, or consider looking at desktop PCs for better performance-per-dollar.")
+
+---
+
+### Scenario B: Recommendations Report (Output Structure)
+
+## Executive Summary
+
+-   **Goal:** To provide a high-level overview of the user's request and the key findings of your analysis.
+-   **Instructions:**
+    1.  Briefly summarize the user's primary goal and key criteria from the `User Profile`.
+    2.  State how many products were identified as Top Recommendations and how many as Strategic Alternatives.
+    3.  Conclude with a sentence that sets the stage for the detailed breakdown. (e.g., "Below is a detailed analysis of the best options based on expert data.")
+
+---
+
+## Top Recommendations (1-3 Products)
+
+-   **Goal:** To present the product(s) that most closely align with the user's needs with minimal compromises.
+-   **Instructions:**
+    -   Present 1-3 products that are an excellent fit. You can present more than one if they cater to different preferences but are equally strong matches (e.g., one is a 2-in-1, the other is a traditional laptop; one is Windows, the other is macOS).
+    -   For **each** product, use the following format:
+
+### [Product Name, e.g., Dell XPS 13 (2023)]
+
+-   **Price:** Provide an approximate price range.
+-   **Justification:**
+    -   Write a detailed paragraph explaining *why this is a top recommendation for this user*.
+    -   Use **bolding** to highlight the specific features that directly address the user's main priorities.
+    -   **Crucially, cite your evidence.** Paraphrase specific findings from the `Expert Review Data` to support your claims. (e.g., "Its build quality is a standout, with reviews consistently praising its **sturdy aluminum and carbon fiber chassis**.").
+    -   Include a "Noteworthy Considerations" bullet point to mention any minor drawbacks or information gaps from the reviews. (e.g., "*Noteworthy Considerations:* While performance is strong, reviews point out the limited port selection. Information on webcam quality was not consistently available in the sources.")
+
+---
+
+## Strategic Alternatives (1-3 Products)
+
+-   **Goal:** To present viable options that require a conscious, significant trade-off from the user.
+-   **Instructions:**
+    -   For **each** alternative, use the following format:
+
+### [Product Name, e.g., MacBook Air (M1)]
+
+-   **Price:** Provide an approximate price range.
+-   **Angle:** In one sentence, explain the strategic reason for considering this product (e.g., "This alternative offers a significant boost in performance and build quality for users willing to exceed their initial budget.").
+-   **Trade-Off Analysis:** This subsection is mandatory.
+    -   **Compromise:** Clearly state what the user **gives up** by choosing this option. (e.g., "**Exceeds Budget:** This model is approximately $200 over your stated maximum.")
+    -   **Benefit:** Clearly state what the user **gains** in return for that compromise. (e.g., "**Unlocks Superior Performance:** The M1 chip is renowned for its speed and efficiency in tasks like photo and video editing.")
+
+---
+
+## Concluding Remarks
+
+-   **Goal:** To summarize the findings and empower the user to make a final decision.
+-   **Instructions:**
+    -   Briefly summarize the core choice the user faces (e.g., "Your decision comes down to the all-around excellence of the Dell XPS 13 versus the superior performance of the MacBook Air, should you choose to stretch your budget.").
+    -   End with a concluding statement that reinforces the report's purpose of enabling an informed choice.
+"""
