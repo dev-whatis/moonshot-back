@@ -81,6 +81,7 @@ def _save_history_to_firestore(full_trace: dict):
             "userId": full_trace.get("userId"),
             "userQuery": full_trace.get("userQuery"),
             "finalRecommendation": full_trace.get("finalRecommendation"),
+            "productNames": full_trace.get("extractedProductNames", []),
             "createdAt": firestore.SERVER_TIMESTAMP,  # Let Firestore set the timestamp
             "conversationId": conversation_id
         }

@@ -11,6 +11,7 @@ from typing import Dict
 from app.services.llm_handler import LLMHandler, run_query_guardrail
 from app.services import search_functions
 from app.services.logging_service import save_completed_conversation, save_rejected_query
+from app.services.parsing_service import extract_product_names_from_markdown
 
 # Import schemas (Pydantic models)
 from app.schemas import (
@@ -196,16 +197,33 @@ async def finalize_recommendation(
         final_recommendations = llm.generate_final_recommendations(rec_scraped_contents)
         trace["finalRecommendation"] = final_recommendations
         print(f"User {user_id} | Step 6 | Generated final recommendations")
+        
+        # --- NEW LOGIC ---
+        # Step 6.5: Post-process the markdown to extract product names
+        product_names = extract_product_names_from_markdown(final_recommendations)
+        trace["extractedProductNames"] = product_names # Also log the extracted names
+        print(f"User {user_id} | Post-processing | Extracted {len(product_names)} product names.")
+        # --- END NEW LOGIC ---
 
         # --- LOGGING ON SUCCESS ---
         trace["status"] = "completed"
         background_tasks.add_task(save_completed_conversation, trace.copy())
         # --- END LOGGING ---
 
-        return {"recommendations": final_recommendations}
+        return {
+            "recommendations": final_recommendations,
+            "productNames": product_names  # Use the camelCase key for the response
+        }
 
     except Exception as e:
         print(f"ERROR in /finalize for user {user_id}: {e}")
+        # Log the failure if a trace exists
+        if "trace" in locals() and trace:
+            trace["status"] = "failed"
+            trace["error"] = str(e)
+            # We can still try to save the failed trace for debugging
+            background_tasks.add_task(save_completed_conversation, trace.copy())
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred during the finalize process: {e}"

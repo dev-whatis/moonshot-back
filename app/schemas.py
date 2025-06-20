@@ -86,7 +86,13 @@ class QuestionsResponse(BaseModel):
 
 class RecommendationsResponse(BaseModel):
     """Data model for the /finalize endpoint response body."""
-    recommendations: str
+    recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
+    product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the report.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 class StopResponse(BaseModel):
     """Data model for the /stop endpoint response body."""
