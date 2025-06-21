@@ -2,7 +2,10 @@
 (search_functions.py) Search and scraping functions using Serper API
 """
 import httpx
-from concurrent.futures import ThreadPoolExecutor
+import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Dict, Any
+
 from app.config import SERPER_API_KEY, MAX_CONCURRENT_REQUESTS
 
 # Refactored to use the httpx library for cleaner and more robust HTTP requests.
@@ -68,12 +71,10 @@ def _scrape_url(url: str) -> str:
         print(f"An unexpected error occurred while scraping URL {url}: {e}")
         return ""
 
-# --- MODIFICATION START ---
 # The following functions related to the buying guide search/scrape phase have been removed:
 # - search_buying_guides
 # - _scrape_single_guide_url
 # - scrape_guide_urls
-# --- MODIFICATION END ---
 
 
 def _search_single_recommendation(query: str) -> dict:
@@ -135,3 +136,101 @@ def scrape_recommendation_urls(rec_search_urls: list) -> list:
         scraped_contents = list(executor.map(_scrape_single_recommendation_url, rec_search_urls))
     
     return scraped_contents
+
+# --- MODIFICATION START: Functions for the new Enrichment feature ---
+
+def search_images_for_products(product_names: List[str]) -> List[Dict[str, Any]]:
+    """
+    Performs a batch image search for a list of product names using Serper.
+    
+    Args:
+        product_names: A list of product name strings to search for.
+        
+    Returns:
+        A list of Serper's raw image search results for each product.
+    """
+    print(f"Performing batch image search for: {product_names}")
+    headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
+    # Create a list of query objects for the batch request
+    payload = json.dumps([{"q": name, "num": 10} for name in product_names])
+    
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post("https://google.serper.dev/images", content=payload, headers=headers)
+            response.raise_for_status()
+        # The result is a list of search result objects, one for each query
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        print(f"Error during batch image search: HTTP {e.response.status_code} - {e.response.text}")
+        return []
+    except Exception as e:
+        print(f"An unexpected error occurred during batch image search: {e}")
+        return []
+
+def search_shopping_for_products(product_names: List[str]) -> List[Dict[str, Any]]:
+    """
+    Performs a batch shopping search for a list of product names using Serper.
+    
+    Args:
+        product_names: A list of product name strings to search for.
+        
+    Returns:
+        A list of Serper's raw shopping search results for each product.
+    """
+    print(f"Performing batch shopping search for: {product_names}")
+    headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
+    # Create a list of query objects for the batch request
+    payload = json.dumps([{"q": name} for name in product_names])
+    
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post("https://google.serper.dev/shopping", content=payload, headers=headers)
+            response.raise_for_status()
+        # The result is a list of search result objects, one for each query
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        print(f"Error during batch shopping search: HTTP {e.response.status_code} - {e.response.text}")
+        return []
+    except Exception as e:
+        print(f"An unexpected error occurred during batch shopping search: {e}")
+        return []
+
+def fetch_enrichment_data(product_names: List[str]) -> List[Dict[str, Any]]:
+    """
+    Orchestrates parallel fetching of image and shopping data for a list of products.
+    Aggregates the results into a structure ready for the LLM.
+    
+    Args:
+        product_names: A list of product names.
+        
+    Returns:
+        A list of dictionaries, where each dictionary contains the product name
+        and its corresponding raw image and shopping data.
+    """
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        # Submit both the image and shopping batch searches to run in parallel
+        future_images = executor.submit(search_images_for_products, product_names)
+        future_shopping = executor.submit(search_shopping_for_products, product_names)
+        
+        # Wait for both batch calls to complete and get their results
+        image_results = future_images.result()
+        shopping_results = future_shopping.result()
+
+    # Create a dictionary to map product names to their results for easy aggregation
+    # The query field in the Serper response lets us map results back to the original name
+    image_map = {result.get('searchParameters', {}).get('q'): result.get('images', []) for result in image_results}
+    shopping_map = {result.get('searchParameters', {}).get('q'): result.get('shopping', []) for result in shopping_results}
+    
+    # Aggregate the data into the final structure
+    aggregated_data = []
+    for name in product_names:
+        aggregated_data.append({
+            "productName": name,
+            "imageData": image_map.get(name, []),
+            "shoppingData": shopping_map.get(name, [])
+        })
+        
+    print(f"Successfully aggregated enrichment data for {len(product_names)} products.")
+    return aggregated_data
+
+# --- MODIFICATION END ---

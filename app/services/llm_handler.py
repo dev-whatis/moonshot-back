@@ -6,6 +6,7 @@ import json
 import datetime
 from google import genai
 from google.genai import types
+from typing import List, Dict, Any
 
 from app.config import GEMINI_API_KEY, MODEL_NAME, GUARDRAIL_MODEL_NAME, DEFAULT_TEMPERATURE, MAX_TOKENS, THINKING_BUDGET
 from app.prompts import (
@@ -13,13 +14,17 @@ from app.prompts import (
     STEP3_MCQ_GENERATION_PROMPT,
     STEP4_SEARCH_QUERY_PROMPT,
     STEP5_WEBSITE_SELECTION_PROMPT,
-    STEP6_FINAL_RECOMMENDATIONS_PROMPT
+    STEP6_FINAL_RECOMMENDATIONS_PROMPT,
+    IMAGE_CURATION_PROMPT,
+    SHOPPING_CURATION_PROMPT
 )
 from app.schemas import (
     GUARDRAIL_RESPONSE_SCHEMA,
     MCQ_QUESTIONS_SCHEMA,
     REC_SEARCH_TERMS_SCHEMA,
-    REC_SEARCH_URLS_SCHEMA
+    REC_SEARCH_URLS_SCHEMA,
+    IMAGE_CURATION_SCHEMA,
+    SHOPPING_CURATION_SCHEMA
 )
 
 # ==============================================================================
@@ -180,7 +185,6 @@ class LLMHandler:
         # Get the raw text response from the LLM
         raw_response_text = self._send_message_text_only(prompt, use_thinking=True)
 
-        # --- MODIFICATION START ---
         # Fail-safe to extract content if the LLM returns a JSON object
         try:
             # Attempt to parse the response as JSON
@@ -200,4 +204,74 @@ class LLMHandler:
             # This is the expected case: the response is plain text/Markdown
             print("INFO: LLM returned plain text for final recommendation as expected.")
             return raw_response_text
-        # --- MODIFICATION END ---
+
+
+# --- MODIFICATION START: Functions for the new Dual-LLM Enrichment feature ---
+
+def curate_images(image_data: List[Dict[str, Any]]) -> Dict:
+    """
+    Makes a stateless call to Gemini to curate the best images for a list of products.
+
+    Args:
+        image_data: A list of objects, each with productName and raw imageData.
+
+    Returns:
+        A dictionary containing the curated image information.
+    """
+    print(f"Sending image data for {len(image_data)} products to Gemini for curation.")
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        prompt = IMAGE_CURATION_PROMPT.format(
+            image_data_json=json.dumps(image_data, indent=2)
+        )
+        
+        response = client.models.generate_content(
+            model=GUARDRAIL_MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=IMAGE_CURATION_SCHEMA,
+                temperature=DEFAULT_TEMPERATURE
+            )
+        )
+        return json.loads(response.text)
+        
+    except Exception as e:
+        # Propagate exception to be handled by the calling service
+        print(f"ERROR: Image curation call failed with exception: {e}")
+        raise
+
+def curate_shopping_links(shopping_data: List[Dict[str, Any]]) -> Dict:
+    """
+    Makes a stateless call to Gemini to curate the best shopping links for a list of products.
+
+    Args:
+        shopping_data: A list of objects, each with productName and raw shoppingData.
+
+    Returns:
+        A dictionary containing the curated shopping link information.
+    """
+    print(f"Sending shopping data for {len(shopping_data)} products to Gemini for curation.")
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        prompt = SHOPPING_CURATION_PROMPT.format(
+            shopping_data_json=json.dumps(shopping_data, indent=2)
+        )
+        
+        response = client.models.generate_content(
+            model=GUARDRAIL_MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=SHOPPING_CURATION_SCHEMA,
+                temperature=DEFAULT_TEMPERATURE
+            )
+        )
+        return json.loads(response.text)
+        
+    except Exception as e:
+        # Propagate exception to be handled by the calling service
+        print(f"ERROR: Shopping link curation call failed with exception: {e}")
+        raise
+
+# --- MODIFICATION END ---

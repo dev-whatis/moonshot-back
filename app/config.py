@@ -4,33 +4,25 @@
 
 import os
 
-# Helper function to read boolean values from environment variables
-def get_bool_from_env(key, default_value):
-    value = os.getenv(key, str(default_value))
-    return value.lower() in ('true', '1', 't')
-
-
-
 # Configuration values that are deployment-specific but not secret are now hardcoded.
 # Secrets like API keys are still loaded from environment variables.
 
 # --- Firebase Configuration ---
 # Set to False for local testing to bypass token verification.
 # In production, this should be True.
-AUTH_ENABLED = True
+AUTH_ENABLED = False
 
 # Path to your Firebase service account key JSON file.
 
 # For production environments (using Google Cloud Secret Manager)
 
-FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
+# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
 
 # For local testing
 # The `firebase-service-account.json` file should be in the root directory.
 # Uncomment the line below to use a local service account key file.
 
-# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
-
+FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
 
 
 # --- Serper API Configuration ---
@@ -56,6 +48,12 @@ GCS_BUCKET_NAME = "moonshot-69420-llm-traces"
 
 # Maximum number of concurrent requests for parallel scraping/searching
 MAX_CONCURRENT_REQUESTS = 5
+
+# For teh LLM enrichment process
+# PRODUCT_CHUNK_SIZE: How many products to include in a single LLM call.
+# LLM_TASK_CONCURRENCY: How many LLM API calls to run in parallel at once.
+PRODUCT_CHUNK_SIZE = 2
+LLM_TASK_CONCURRENCY = 6
 
 
 # --- Validation and Warnings ---

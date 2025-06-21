@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 
 # Import routers and middleware initializers
 from app.routers import recommendations
+from app.routers import enrich  # --- MODIFICATION: Import the new enrich router ---
 from app.middleware.auth import initialize_firebase
 from app.config import AUTH_ENABLED
 
@@ -25,7 +26,6 @@ async def lifespan(app: FastAPI):
     # Code to run on application startup
     print("--- Application Startup ---")
     if AUTH_ENABLED:
-        # --- MODIFICATION START ---
         # Only initialize Firebase if authentication is actually enabled
         try:
             initialize_firebase()
@@ -39,7 +39,6 @@ async def lifespan(app: FastAPI):
             print("  - Are the Firebase project permissions configured correctly?")
             print("=====================================================================\n")
             sys.exit(1)
-        # --- MODIFICATION END ---
     else:
         print("Authentication is disabled. Skipping Firebase initialization.")
     
@@ -55,8 +54,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Product Recommendation API",
-    description="An API that provides personalized product recommendations using a multi-step AI-driven process.",
-    version="1.0.0",
+    description="An API that provides personalized product recommendations and data enrichment using a multi-step AI-driven process.",
+    version="1.1.0", # Bump version number to reflect new feature
     lifespan=lifespan  # Use the lifespan manager for startup/shutdown events
 )
 
@@ -83,6 +82,7 @@ app.add_middleware(
 
 # Include the recommendation routes from the router file
 app.include_router(recommendations.router)
+app.include_router(enrich.router)  # --- MODIFICATION: Include the new enrich router ---
 
 
 # ==============================================================================

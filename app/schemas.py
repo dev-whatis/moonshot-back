@@ -61,6 +61,15 @@ class FinalizeRequest(BaseModel):
         populate_by_name=True,
     )
 
+class EnrichRequest(BaseModel):
+    """Data model for the /enrich endpoint request body."""
+    product_names: List[str] = Field(..., alias="productNames", description="A list of product names to be enriched with images and shopping links.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
 
 # --- Response Models ---
 
@@ -108,6 +117,34 @@ class RejectionResponse(BaseModel):
     reason: str
 
 
+class ShoppingLink(BaseModel):
+    """Data model for a single curated shopping link."""
+    source: str = Field(..., description="The name of the store or vendor.", example="Dell.com")
+    link: str = Field(..., description="The direct URL to the product page.", example="https://www.dell.com/en-us/shop/...")
+    price: str = Field(..., description="The price of the product as a string.", example="$1,199.00")
+    delivery: str = Field(..., description="Delivery information, e.g., 'Free shipping'.", example="Free shipping")
+
+class EnrichedProduct(BaseModel):
+    """Data model for a single product enriched with images and shopping links."""
+    product_name: str = Field(..., alias="productName", description="The name of the product.")
+    images: List[str] = Field(..., description="A list of curated image URLs for the product.")
+    shopping_links: List[ShoppingLink] = Field(..., alias="shoppingLinks", description="A list of curated shopping links for the product.")
+    
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class EnrichResponse(BaseModel):
+    """Data model for the /enrich endpoint response body."""
+    enriched_products: List[EnrichedProduct] = Field(..., alias="enrichedProducts")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+
 # ==============================================================================
 # Internal OpenAPI Schemas for Gemini Interactions
 # ==============================================================================
@@ -128,10 +165,8 @@ GUARDRAIL_RESPONSE_SCHEMA = {
     "required": ["is_product_request", "reason"]
 }
 
-# --- MODIFICATION START ---
 # Schemas for Step 1 (GUIDE_SEARCH_TERM_SCHEMA) and Step 2 (GUIDE_SEARCH_URLS_SCHEMA)
 # have been removed as they are no longer in use.
-# --- MODIFICATION END ---
 
 
 # Step 3: MCQ Generation
@@ -221,3 +256,67 @@ REC_SEARCH_URLS_SCHEMA = {
     },
     "required": ["rec_search_urls"]
 }
+
+
+# --- MODIFICATION START: Schemas for the new Dual-LLM Enrichment feature ---
+IMAGE_CURATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "curatedImages": {
+            "type": "array",
+            "description": "A list of image curation objects, one for each product in the input.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "productName": {
+                        "type": "string",
+                        "description": "The name of the product, copied from the input."
+                    },
+                    "images": {
+                        "type": "array",
+                        "description": "A list of 3-4 selected image URLs.",
+                        "items": {"type": "string"}
+                    }
+                },
+                "required": ["productName", "images"]
+            }
+        }
+    },
+    "required": ["curatedImages"]
+}
+
+SHOPPING_CURATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "curatedShoppingLinks": {
+            "type": "array",
+            "description": "A list of shopping link curation objects, one for each product in the input.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "productName": {
+                        "type": "string",
+                        "description": "The name of the product, copied from the input."
+                    },
+                    "shoppingLinks": {
+                        "type": "array",
+                        "description": "A list of the top 2 selected shopping links.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "source": {"type": "string"},
+                                "link": {"type": "string"},
+                                "price": {"type": "string"},
+                                "delivery": {"type": "string"}
+                            },
+                            "required": ["source", "link", "price", "delivery"]
+                        }
+                    }
+                },
+                "required": ["productName", "shoppingLinks"]
+            }
+        }
+    },
+    "required": ["curatedShoppingLinks"]
+}
+# --- MODIFICATION END ---
