@@ -10,7 +10,7 @@ import os
 # --- Firebase Configuration ---
 # Set to False for local testing to bypass token verification.
 # In production, this should be True.
-# AUTH_ENABLED = True
+AUTH_ENABLED = True
 
 # Path to your Firebase service account key JSON file.
 
