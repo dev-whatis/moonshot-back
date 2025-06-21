@@ -3,46 +3,16 @@
 """
 import httpx
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
 
 from app.config import SERPER_API_KEY, MAX_CONCURRENT_REQUESTS
 
-# Refactored to use the httpx library for cleaner and more robust HTTP requests.
-def _search_google(query: str) -> list:
-    """
-    Helper function to search Google using Serper API.
-    
-    Args:
-        query (str): Search query.
-    
-    Returns:
-        list: Organic search results, or an empty list on failure.
-    """
-    try:
-        headers = {
-            'X-API-KEY': SERPER_API_KEY,
-            'Content-Type': 'application/json'
-        }
-        payload = {"q": query}
-        
-        with httpx.Client() as client:
-            response = client.post("https://google.serper.dev/search", json=payload, headers=headers)
-            response.raise_for_status()  # Raise an exception for 4XX or 5XX status codes
-            search_results = response.json()
-        
-        return search_results.get("organic", [])
-        
-    except httpx.HTTPStatusError as e:
-        print(f"Error searching Google for query '{query}': HTTP {e.response.status_code} - {e.response.text}")
-        return []
-    except Exception as e:
-        print(f"An unexpected error occurred during Google search for query '{query}': {e}")
-        return []
-
+# --- Function to scrape a single URL using Serper API ---
 def _scrape_url(url: str) -> str:
     """
-    Helper function to scrape a URL using Serper API.
+    Helper function to scrape a URL using Serper API. This must be called
+    one URL at a time.
     
     Args:
         url (str): URL to scrape.
@@ -71,39 +41,54 @@ def _scrape_url(url: str) -> str:
         print(f"An unexpected error occurred while scraping URL {url}: {e}")
         return ""
 
-# The following functions related to the buying guide search/scrape phase have been removed:
-# - search_buying_guides
-# - _scrape_single_guide_url
-# - scrape_guide_urls
 
-
-def _search_single_recommendation(query: str) -> dict:
-    """Helper function for parallel product recommendation searching."""
-    print(f"Searching for: {query}")
-    organic_results = _search_google(query)
-    
-    return {
-        "query": query,
-        "results": organic_results
-    }
+# --- MODIFICATION START: OPTIMIZED BATCH SEARCH ---
 
 def search_product_recommendations(rec_search_terms: list) -> list:
     """
-    Step 4.5: Search for product recommendations using the recommendation search terms (PARALLELIZED).
+    Step 4.5: Search for product recommendations using a single BATCH request (OPTIMIZED).
     
     Args:
         rec_search_terms (list): List of search terms for finding product recommendations.
     
     Returns:
-        list: Search results for each query.
+        list: A list of search result objects, formatted to match the application's
+              expected structure: [{"query": str, "results": list}, ...].
     """
-    print(f"Searching for product recommendations with terms: {rec_search_terms}")
+    print(f"Performing batch Google search for recommendation terms: {rec_search_terms}")
+    headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
+    # Create a list of query objects for the batch request
+    payload = json.dumps([{"q": term} for term in rec_search_terms])
     
-    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
-        # Process all search terms in parallel
-        results = list(executor.map(_search_single_recommendation, rec_search_terms))
-    
-    return results
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post("https://google.serper.dev/search", content=payload, headers=headers)
+            response.raise_for_status()
+        
+        # The result is a list of search result objects, one for each query
+        batch_results = response.json()
+        
+        # Transform the raw batch response to the format expected by the rest of the application
+        formatted_results = []
+        for result in batch_results:
+            original_query = result.get('searchParameters', {}).get('q', 'unknown')
+            organic_results = result.get('organic', [])
+            formatted_results.append({
+                "query": original_query,
+                "results": organic_results
+            })
+        
+        return formatted_results
+
+    except httpx.HTTPStatusError as e:
+        print(f"Error during batch Google search: HTTP {e.response.status_code} - {e.response.text}")
+        return []
+    except Exception as e:
+        print(f"An unexpected error occurred during batch Google search: {e}")
+        return []
+
+# --- MODIFICATION END ---
+
 
 def _scrape_single_recommendation_url(url_obj: dict) -> dict:
     """Helper function for parallel scraping of recommendation URLs."""
@@ -122,6 +107,7 @@ def _scrape_single_recommendation_url(url_obj: dict) -> dict:
 def scrape_recommendation_urls(rec_search_urls: list) -> list:
     """
     Step 5.5: Scrape content from selected product recommendation URLs (PARALLELIZED).
+    This function remains unchanged as scraping must be done one URL at a time.
     
     Args:
         rec_search_urls (list): List of URL objects with title and url keys.
@@ -137,7 +123,7 @@ def scrape_recommendation_urls(rec_search_urls: list) -> list:
     
     return scraped_contents
 
-# --- MODIFICATION START: Functions for the new Enrichment feature ---
+# --- Functions for the Enrichment feature (already optimized) ---
 
 def search_images_for_products(product_names: List[str]) -> List[Dict[str, Any]]:
     """
@@ -232,5 +218,3 @@ def fetch_enrichment_data(product_names: List[str]) -> List[Dict[str, Any]]:
         
     print(f"Successfully aggregated enrichment data for {len(product_names)} products.")
     return aggregated_data
-
-# --- MODIFICATION END ---
