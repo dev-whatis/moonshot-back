@@ -30,3 +30,8 @@ How to run locally:
 
 Finally,
 uvicorn app.main:app --reload
+
+
+To run the dummy backend:
+
+uvicorn dummy_main:app --reload
