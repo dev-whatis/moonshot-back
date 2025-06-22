@@ -22,12 +22,11 @@ firebase-service-account.json
 
 
 
-
 How to run locally:
 
 - Set AUTH_ENABLED to False
+- Set CONVERSATION_ID_ENABLED to False
 - Set FIREBASE_SERVICE_ACCOUNT_KEY_PATH to "firebase-service-account.json" in config.py
 
-
-
+Finally,
 uvicorn app.main:app --reload
