@@ -10,19 +10,19 @@ import os
 # --- Firebase Configuration ---
 # Set to False for local testing to bypass token verification.
 # In production, this should be True.
-AUTH_ENABLED = True
+AUTH_ENABLED = False
 
 # Path to your Firebase service account key JSON file.
 
 # For production environments (using Google Cloud Secret Manager)
 
-FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
+# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
 
 # For local testing
 # The `firebase-service-account.json` file should be in the root directory.
 # Uncomment the line below to use a local service account key file.
 
-# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
+FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
 
 
 # --- Serper API Configuration ---
@@ -32,12 +32,11 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY", "your_serper_api_key_here")
 # --- Gemini API Configuration ---
 # This is a secret and should be set in your .env file
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your_gemini_api_key_here")
-MODEL_NAME = "gemini-2.5-flash"
-GUARDRAIL_MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"
+HIGH_MODEL_NAME = "gemini-2.5-flash"
+LOW_MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"
 
 # --- Model Configuration ---
-DEFAULT_TEMPERATURE = 0.7
-MAX_TOKENS = 8192
+DEFAULT_TEMPERATURE = 0.8
 THINKING_BUDGET = -1
 
 # --- Google Cloud Project Configuration ---

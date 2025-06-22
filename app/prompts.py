@@ -151,6 +151,9 @@ This multi-angle approach is essential for gathering the high-quality evidence n
 
 Analyze the user's answers below and generate a portfolio of 3-5 strategic search queries. The queries must be natural, distinct, and designed to gather a comprehensive set of information. Always include the current year ({current_year}).
 
+**User's Initial Request:**
+"{user_query}"
+
 **User's Answers:**
 {user_answers_json}
 
@@ -160,7 +163,14 @@ Generate the 3-5 best search queries in the specified JSON format.
 # Step 5: Final Website Selection
 STEP5_WEBSITE_SELECTION_PROMPT = """You are a meticulous Research Analyst and Information Quality Specialist. Your critical mission is to act as the final gatekeeper, selecting a small, high-impact portfolio of web pages for in-depth analysis. The quality of your selection directly determines the validity of the final recommendation. Garbage in, garbage out.
 
-Your task is to analyze the provided search results through the lens of the user's specific needs and select a portfolio of the **4 to 5 most valuable and diverse websites**.
+Your task is to analyze the provided search results and select a portfolio of the **4 to 5 most valuable and diverse websites** that best address the user's needs, as detailed below.
+
+### User Context
+**Initial Request:** "{user_query}"
+**Detailed Needs (from questionnaire):**
+{user_answers_json}
+
+---
 
 This is a multi-step process. Follow these phases precisely:
 
@@ -177,7 +187,7 @@ For the remaining candidates, evaluate them using the following hierarchy. A sou
 **High Priority Signals (Highest Weight):**
 - **Domain Authority & Trust:** Does the domain belong to an established publication known for impartial, in-depth reviews and expert testing? **Give maximum weight to sites whose primary purpose is to review products, rather than sites that primarily sell products or represent a single brand.**
 - **Evidence of Testing:** Does the `title` or `snippet` contain keywords that signal in-depth, original work? Look for: `review`, `tested`, `hands-on`, `benchmarks`, `lab tests`, `vs`, `comparison`, `in-depth`.
-- **Hyper-Relevance to User Need:** Does the `title` or `snippet` directly address a critical priority from the `User Profile`? (e.g., if the user wants a laptop for "photo editing," a link titled "Best Laptops for Photo Editing" is more valuable than a generic "Best Laptops" article).
+- **Hyper-Relevance to User Need:** Does the `title` or `snippet` directly address a critical priority detailed in the `User Context` above? (e.g., if the user wants a laptop for "photo editing," a link titled "Best Laptops for Photo Editing" is more valuable than a generic "Best Laptops" article).
 
 **Medium Priority Signals (Good Supporting Indicators):**
 - **Recency:** The article is from the `{current_year}` or `{previous_year}`. This is crucial for most product categories.
@@ -221,8 +231,9 @@ STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product analyst and recommenda
 
 ### INPUTS
 
-**1. User Profile:**
-Should be formed based on the user's answers to the questionnaire (should in the previous chat context/history). It should include their primary goal, key criteria, and any specific requirements they have for the product.
+**1. User Context:**
+*   **Initial Request:** "{user_query}"
+*   **Detailed Needs (from questionnaire):** {user_answers_json}
 
 **2. Expert Review Data:**
 {rec_scraped_contents_json}

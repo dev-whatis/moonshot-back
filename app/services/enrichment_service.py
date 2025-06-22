@@ -6,7 +6,8 @@ from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.services.search_functions import fetch_enrichment_data
-from app.services.llm_handler import curate_images, curate_shopping_links
+# --- MODIFICATION: Import from the new llm_calls module ---
+from app.services.llm_calls import curate_images, curate_shopping_links
 from app.schemas import EnrichResponse
 from app.config import PRODUCT_CHUNK_SIZE, LLM_TASK_CONCURRENCY
 
@@ -69,7 +70,7 @@ async def enrich_products(product_names: List[str]) -> Dict[str, Any]:
         print("Warning: Failed to fetch any enrichment data from search services.")
         return {"enrichedProducts": []}
     
-    # --- MODIFICATION START ---
+    # --- Start of Parallel LLM Curation Logic ---
 
     # Step 2: Chunk the raw data into smaller lists based on PRODUCT_CHUNK_SIZE.
     product_chunks = [
@@ -129,7 +130,7 @@ async def enrich_products(product_names: List[str]) -> Dict[str, Any]:
     final_image_results = {"curatedImages": all_curated_images}
     final_shopping_results = {"curatedShoppingLinks": all_curated_shopping_links}
 
-    # --- MODIFICATION END ---
+    # --- End of Parallel LLM Curation Logic ---
 
     # Step 7: Merge the results from the aggregated calls.
     final_combined_data = _combine_curation_results(final_image_results, final_shopping_results)

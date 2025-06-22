@@ -7,9 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from typing import Dict
 
 # Import services and handlers
-# --- MODIFICATION: Import the new stateless guardrail function ---
-from app.services.llm_handler import LLMHandler, run_query_guardrail
-from app.services import search_functions
+# --- MODIFICATION: Import the new stateless llm_calls module ---
+from app.services import llm_calls, search_functions
 from app.services.logging_service import save_completed_conversation, save_rejected_query
 from app.services.parsing_service import extract_product_names_from_markdown
 
@@ -35,6 +34,7 @@ router = APIRouter(
     tags=["Recommendations"]
 )
 
+# In-memory store for active sessions. The value is now just the trace dictionary.
 ACTIVE_SESSIONS: Dict[str, Dict] = {}
 
 
@@ -61,7 +61,7 @@ async def start_recommendation(
     print(f"User {user_id} | Step 0 | Performing guardrail check for query: '{request.user_query}'")
     
     # --- STEP 0: STATELESS GUARDRAIL (THE BOUNCER) ---
-    guardrail_result = run_query_guardrail(request.user_query)
+    guardrail_result = llm_calls.run_query_guardrail(request.user_query)
     
     if not guardrail_result.get("is_product_request"):
         print(f"User {user_id} | REJECTED | Reason: {guardrail_result.get('reason')}")
@@ -89,8 +89,8 @@ async def start_recommendation(
     # --- GUARDRAIL PASSED: PROCEED TO CREATE SESSION ---
     
     conversation_id = str(uuid.uuid4())
+    # The session no longer holds a stateful LLM object, just the trace.
     session_data = {
-        "llm": LLMHandler(),
         "conversation_id": conversation_id,
         "trace": {
             "conversationId": conversation_id,
@@ -102,12 +102,11 @@ async def start_recommendation(
     ACTIVE_SESSIONS[user_id] = session_data
     
     try:
-        llm = session_data["llm"]
         trace = session_data["trace"]
 
-        # Step 3: Generate MCQ questions using the LLM's internal knowledge.
+        # Step 3: Generate MCQ questions using a stateless LLM call.
         print(f"User {user_id} | Step 3 | Generating questions from internal knowledge...")
-        questions = llm.generate_mcq_questions(request.user_query)
+        questions = llm_calls.generate_mcq_questions(request.user_query)
         trace["generatedQuestions"] = questions
         print(f"User {user_id} | Step 3 | Generated {len(questions)} questions")
         
@@ -168,15 +167,18 @@ async def finalize_recommendation(
             detail="Active session not found. Please start a new recommendation via the /start endpoint."
         )
     
-    llm = session_data["llm"]
     trace = session_data["trace"]
 
     try:
         user_answers_dict = [answer.dict(by_alias=True) for answer in request.user_answers]
         trace["userAnswers"] = user_answers_dict
-        
+        user_query = trace["userQuery"] # Retrieve initial query from trace for stateless calls
+
         # Step 4: Generate search queries for recommendations
-        rec_search_terms = llm.generate_search_queries(user_answers_dict)
+        rec_search_terms = llm_calls.generate_search_queries(
+            user_query=user_query, 
+            user_answers=user_answers_dict
+        )
         trace["recSearchTerms"] = rec_search_terms
         print(f"User {user_id} | Step 4 | Generated {len(rec_search_terms)} search queries")
 
@@ -185,7 +187,11 @@ async def finalize_recommendation(
         trace["recSearchResults"] = "Content too large, omitted from in-memory trace."
 
         # Step 5: Select best recommendation URLs
-        rec_urls = llm.select_recommendation_urls(rec_search_results)
+        rec_urls = llm_calls.select_recommendation_urls(
+            user_query=user_query,
+            user_answers=user_answers_dict,
+            rec_search_results=rec_search_results
+        )
         trace["selectedRecUrls"] = rec_urls
         print(f"User {user_id} | Step 5 | Selected {len(rec_urls)} recommendation sources")
 
@@ -194,16 +200,18 @@ async def finalize_recommendation(
         trace["scrapedRecContent"] = "Content too large, omitted from in-memory trace."
 
         # Step 6: Generate final recommendations
-        final_recommendations = llm.generate_final_recommendations(rec_scraped_contents)
+        final_recommendations = llm_calls.generate_final_recommendations(
+            user_query=user_query,
+            user_answers=user_answers_dict,
+            rec_scraped_contents=rec_scraped_contents
+        )
         trace["finalRecommendation"] = final_recommendations
         print(f"User {user_id} | Step 6 | Generated final recommendations")
         
-        # --- NEW LOGIC ---
         # Step 6.5: Post-process the markdown to extract product names
         product_names = extract_product_names_from_markdown(final_recommendations)
         trace["extractedProductNames"] = product_names # Also log the extracted names
         print(f"User {user_id} | Post-processing | Extracted {len(product_names)} product names.")
-        # --- END NEW LOGIC ---
 
         # --- LOGGING ON SUCCESS ---
         trace["status"] = "completed"
