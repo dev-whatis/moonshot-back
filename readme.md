@@ -6,7 +6,7 @@ app/schemas.py
 app/middleware/auth.py
 app/routers/recommendations.py
 app/routers/enrich.py
-app/services/llm_handler.py
+app/services/llm_calls.py
 app/services/search_functions.py
 app/services/logging_service.py
 app/services/parsing_service.py

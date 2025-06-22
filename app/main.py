@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 
 # Import routers and middleware initializers
 from app.routers import recommendations
-from app.routers import enrich  # --- MODIFICATION: Import the new enrich router ---
+from app.routers import enrich
 from app.middleware.auth import initialize_firebase
 from app.config import AUTH_ENABLED
 
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Product Recommendation API",
     description="An API that provides personalized product recommendations and data enrichment using a multi-step AI-driven process.",
-    version="1.1.0", # Bump version number to reflect new feature
+    version="1.2.0", # Bump version number to reflect new architecture
     lifespan=lifespan  # Use the lifespan manager for startup/shutdown events
 )
 
@@ -82,7 +82,7 @@ app.add_middleware(
 
 # Include the recommendation routes from the router file
 app.include_router(recommendations.router)
-app.include_router(enrich.router)  # --- MODIFICATION: Include the new enrich router ---
+app.include_router(enrich.router)
 
 
 # ==============================================================================

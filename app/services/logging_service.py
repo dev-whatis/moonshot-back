@@ -4,19 +4,17 @@
 
 import json
 import datetime
+from typing import Optional, Dict, Any
 from google.cloud import firestore, storage
 
-from app.config import GCP_PROJECT_ID, GCS_BUCKET_NAME
+from app.config import GCP_PROJECT_ID, GCS_BUCKET_NAME, CONVERSATION_ID_ENABLED
 
 # ==============================================================================
 # Client Initialization
 # ==============================================================================
 
 # Initialize clients once when the module is imported.
-# They will be reused across function calls.
 try:
-    # When deployed, the service account associated with Cloud Run will be used automatically.
-    # For local development, `gcloud auth application-default login` provides credentials.
     firestore_client = firestore.Client(project=GCP_PROJECT_ID)
     storage_client = storage.Client(project=GCP_PROJECT_ID)
     gcs_bucket = storage_client.bucket(GCS_BUCKET_NAME)
@@ -33,119 +31,128 @@ except Exception as e:
 # Service Functions
 # ==============================================================================
 
-def _save_trace_to_gcs(full_trace: dict):
+def log_step(conversation_id: Optional[str], step_name: str, step_data: Dict[str, Any]):
     """
-    Uploads the full conversation trace as a JSON file to Google Cloud Storage.
+    Logs the data for a single step of a conversation to GCS for debugging.
+    This function will do nothing if CONVERSATION_ID_ENABLED is False or if
+    no conversation_id is provided.
+
+    Args:
+        conversation_id: The unique ID for the entire conversation.
+        step_name: The name of the file to be created (e.g., "01_start", "02_finalize").
+        step_data: A dictionary containing the JSON-serializable data for this step.
     """
+    if not CONVERSATION_ID_ENABLED or not conversation_id:
+        print(f"INFO: GCS logging for step '{step_name}' skipped (disabled by config or no ID).")
+        return
+
+    if not gcs_bucket:
+        print(f"Skipping log for conv_id {conversation_id} because GCS client is not initialized.")
+        return
+
     try:
-        # Extract necessary fields for partitioning
-        conversation_id = full_trace.get("conversationId", "unknown-id")
-        user_id = full_trace.get("userId", "unknown-user")
-        
-        # Get the current time in UTC for partitioning
         now_utc = datetime.datetime.now(datetime.timezone.utc)
-        year = now_utc.strftime("%Y")
-        month = now_utc.strftime("%m")
-        day = now_utc.strftime("%d")
-
+        
+        # Add metadata to the log payload
+        step_data["_log_timestamp_utc"] = now_utc.isoformat()
+        step_data["_conversation_id"] = conversation_id
+        step_data["_step_name"] = step_name
+        
         # Construct the partitioned GCS object path
-        # Example: traces/2023/10/28/user-A-123/abc-123.json
-        gcs_path = f"traces/{year}/{month}/{day}/{user_id}/{conversation_id}.json"
+        year, month, day = now_utc.strftime("%Y"), now_utc.strftime("%m"), now_utc.strftime("%d")
+        gcs_path = f"traces/{year}/{month}/{day}/{conversation_id}/{step_name}.json"
         
-        # Get a "blob" (the GCS object reference)
         blob = gcs_bucket.blob(gcs_path)
+        log_json = json.dumps(step_data, indent=2, ensure_ascii=False)
+        blob.upload_from_string(log_json, content_type="application/json")
         
-        # Serialize the trace dictionary to a JSON string and upload
-        # `ensure_ascii=False` is good practice for handling non-English text
-        trace_json = json.dumps(full_trace, indent=2, ensure_ascii=False)
-        blob.upload_from_string(trace_json, content_type="application/json")
-        
-        print(f"Successfully saved trace for conv_id {conversation_id} to GCS at {gcs_path}")
+        print(f"Successfully saved GCS log for conv_id {conversation_id}, step {step_name}.")
 
     except Exception as e:
-        # Log the error but don't crash the background task.
-        print(f"ERROR: Failed to save trace to GCS for conv_id {full_trace.get('conversationId')}: {e}")
+        print(f"ERROR: Failed to save GCS log for conv_id {conversation_id}, step {step_name}: {e}")
 
-def _save_history_to_firestore(full_trace: dict):
+def create_history_document(conversation_id: Optional[str], initial_data: Dict[str, Any]):
     """
-    Saves a small, user-facing chat history document to Firestore.
+    Creates the initial user-facing history document in Firestore.
+    This function will do nothing if CONVERSATION_ID_ENABLED is False or if
+    no conversation_id is provided.
     """
+    if not CONVERSATION_ID_ENABLED or not conversation_id:
+        print("INFO: Firestore history creation skipped (disabled by config or no ID).")
+        return
+
+    if not firestore_client:
+        print(f"Skipping Firestore create for conv_id {conversation_id}, client not initialized.")
+        return
+        
     try:
-        conversation_id = full_trace.get("conversationId")
-        if not conversation_id:
-            print("ERROR: Cannot save to Firestore without a conversationId.")
-            return
-
-        # Construct the small chat history document
-        history_doc = {
-            "userId": full_trace.get("userId"),
-            "userQuery": full_trace.get("userQuery"),
-            "finalRecommendation": full_trace.get("finalRecommendation"),
-            "productNames": full_trace.get("extractedProductNames", []),
-            "createdAt": firestore.SERVER_TIMESTAMP,  # Let Firestore set the timestamp
-            "conversationId": conversation_id
-        }
-
-        # Set the document in the 'histories' collection with the conversationId as the document ID
         doc_ref = firestore_client.collection("histories").document(conversation_id)
-        doc_ref.set(history_doc)
-        
-        print(f"Successfully saved history for conv_id {conversation_id} to Firestore.")
-
+        # Add creation timestamp and conversation ID to the document
+        initial_data["createdAt"] = firestore.SERVER_TIMESTAMP
+        initial_data["conversationId"] = conversation_id
+        doc_ref.set(initial_data)
+        print(f"Successfully CREATED history doc for conv_id {conversation_id} in Firestore.")
     except Exception as e:
-        print(f"ERROR: Failed to save history to Firestore for conv_id {conversation_id}: {e}")
+        print(f"ERROR: Failed to CREATE history doc in Firestore for conv_id {conversation_id}: {e}")
+
+def update_history_with_enrichment(conversation_id: Optional[str], enriched_products: list):
+    """
+    Updates an existing history document with enriched product data.
+    This function will do nothing if CONVERSATION_ID_ENABLED is False or if
+    no conversation_id is provided.
+    """
+    if not CONVERSATION_ID_ENABLED or not conversation_id:
+        print("INFO: Firestore history update skipped (disabled by config or no ID).")
+        return
+
+    if not firestore_client:
+        print(f"Skipping Firestore update for conv_id {conversation_id}, client not initialized.")
+        return
+
+    try:
+        doc_ref = firestore_client.collection("histories").document(conversation_id)
+        update_payload = {
+            "enrichedProducts": enriched_products,
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        }
+        doc_ref.update(update_payload)
+        print(f"Successfully UPDATED history doc for conv_id {conversation_id} in Firestore.")
+    except Exception as e:
+        print(f"ERROR: Failed to UPDATE history doc in Firestore for conv_id {conversation_id}: {e}")
 
 def save_rejected_query(rejection_data: dict):
     """
+
     Saves a record of a rejected query to a dedicated location in GCS.
-    This is designed for stateless guardrail rejections and expects a 'rejectionId'.
+    This operates independently of the CONVERSATION_ID_ENABLED flag as it's for
+    pre-conversation rejections.
     """
     if not gcs_bucket:
         print("Skipping rejection logging because GCS client is not initialized.")
         return
 
     try:
-        # For stateless rejections, we expect a 'rejectionId' from the router.
         rejection_id = rejection_data.get("rejectionId", "unknown-rejection-id")
         user_id = rejection_data.get("userId", "unknown-user")
         
         now_utc = datetime.datetime.now(datetime.timezone.utc)
-        year = now_utc.strftime("%Y")
-        month = now_utc.strftime("%m")
-        day = now_utc.strftime("%d")
+        year, month, day = now_utc.strftime("%Y"), now_utc.strftime("%m"), now_utc.strftime("%d")
 
-        # Use a different subfolder for rejected queries
-        gcs_path = f"rejected_queries/{year}/{month}/{day}/{user_id}/{rejection_id}.json"
+        # Use a different top-level folder for rejected queries
+        # The file name is now the step name for consistency.
+        gcs_path = f"traces/{year}/{month}/{day}/{rejection_id}/00_rejection.json"
         
         blob = gcs_bucket.blob(gcs_path)
         
-        # Add a server timestamp to the log
-        rejection_data["rejectedAt"] = now_utc.isoformat()
+        rejection_data["_log_timestamp_utc"] = now_utc.isoformat()
+        rejection_data["_conversation_id"] = rejection_id
+        rejection_data["_step_name"] = "00_rejection"
 
         log_json = json.dumps(rejection_data, indent=2, ensure_ascii=False)
         blob.upload_from_string(log_json, content_type="application/json")
         
-        print(f"Successfully saved rejected query log for rejection_id '{rejection_id}' to GCS at {gcs_path}")
+        print(f"Successfully saved rejected query log for id '{rejection_id}' to GCS.")
 
     except Exception as e:
         rejection_id_for_error = rejection_data.get("rejectionId")
-        print(f"ERROR: Failed to save rejected query log to GCS for rejection_id '{rejection_id_for_error}': {e}")
-
-
-def save_completed_conversation(full_trace: dict):
-    """
-    The main public function to be called as a background task.
-    Orchestrates saving the full trace to GCS and the history to Firestore.
-    
-    Args:
-        full_trace (dict): A dictionary containing the entire conversation trace.
-    """
-    if not firestore_client or not gcs_bucket:
-        print("Skipping logging because Google Cloud clients are not initialized.")
-        return
-
-    print(f"Saving completed conversation log for conv_id: {full_trace.get('conversationId')}")
-    
-    # Run the save operations
-    _save_history_to_firestore(full_trace)
-    _save_trace_to_gcs(full_trace)
+        print(f"ERROR: Failed to save rejected query log to GCS for id '{rejection_id_for_error}': {e}")

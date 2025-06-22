@@ -7,6 +7,11 @@ import os
 # Configuration values that are deployment-specific but not secret are now hardcoded.
 # Secrets like API keys are still loaded from environment variables.
 
+# --- Development & Testing Flags ---
+# Set to True for production to enforce conversationId and enable logging.
+# Set to False for local testing to make conversationId optional and disable logging.
+CONVERSATION_ID_ENABLED = True
+
 # --- Firebase Configuration ---
 # Set to False for local testing to bypass token verification.
 # In production, this should be True.

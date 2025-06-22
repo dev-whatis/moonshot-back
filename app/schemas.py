@@ -54,6 +54,10 @@ class UserAnswer(BaseModel):
 
 class FinalizeRequest(BaseModel):
     """Data model for the /finalize endpoint request body."""
+    # --- MODIFICATION START ---
+    conversation_id: Optional[str] = Field(None, alias="conversationId", description="The unique ID for the conversation flow. Optional for local testing.")
+    user_query: str = Field(..., alias="userQuery", description="The original user query, passed back by the client.")
+    # --- MODIFICATION END ---
     user_answers: List[UserAnswer] = Field(..., description="A list of the user's answers to the questionnaire.")
 
     model_config = ConfigDict(
@@ -63,6 +67,9 @@ class FinalizeRequest(BaseModel):
 
 class EnrichRequest(BaseModel):
     """Data model for the /enrich endpoint request body."""
+    # --- MODIFICATION START ---
+    conversation_id: Optional[str] = Field(None, alias="conversationId", description="The ID of the recommendation conversation this enrichment is for. Optional for local testing.")
+    # --- MODIFICATION END ---
     product_names: List[str] = Field(..., alias="productNames", description="A list of product names to be enriched with images and shopping links.")
 
     model_config = ConfigDict(
@@ -89,9 +96,18 @@ class Question(BaseModel):
     min: Optional[float] = None
     max: Optional[float] = None
 
-class QuestionsResponse(BaseModel):
+# --- MODIFICATION START: Replaced QuestionsResponse with StartResponse ---
+class StartResponse(BaseModel):
     """Data model for the /start endpoint response body."""
+    conversation_id: str = Field(..., alias="conversationId")
     questions: List[Question]
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+# --- MODIFICATION END ---
+
 
 class RecommendationsResponse(BaseModel):
     """Data model for the /finalize endpoint response body."""
@@ -110,6 +126,7 @@ class StopResponse(BaseModel):
 
 class RejectionResponse(BaseModel):
     """
+
     Data model for the structured rejection response sent to the client
     when the user's query is out-of-scope.
     """
