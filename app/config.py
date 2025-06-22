@@ -56,7 +56,7 @@ MAX_CONCURRENT_REQUESTS = 5
 # For teh LLM enrichment process
 # PRODUCT_CHUNK_SIZE: How many products to include in a single LLM call.
 # LLM_TASK_CONCURRENCY: How many LLM API calls to run in parallel at once.
-PRODUCT_CHUNK_SIZE = 2
+PRODUCT_CHUNK_SIZE = 1
 LLM_TASK_CONCURRENCY = 6
 
 

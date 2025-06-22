@@ -320,27 +320,31 @@ First, analyze if any products in the `Expert Review Data` meet the user's core,
 """
 
 # Step 7a: Image Curation
-IMAGE_CURATION_PROMPT = """You are an expert E-commerce Image Analyst. Your task is to analyze image metadata and select a professional, high-quality image gallery for each product.
+IMAGE_CURATION_PROMPT = """You are an expert Digital Merchandiser. Your task is to analyze image metadata to select a professional, high-quality, and visually appealing gallery for each product, suitable for an e-commerce product carousel.
 
 ### Core Directives
-1.  **Analyze Metadata Only:** Your selection must be based solely on the provided metadata. **You cannot see the actual images.**
+1.  **Analyze Metadata Only:** Your selection must be based solely on the provided metadata. **You cannot see the actual images.** Your skill is in interpreting the clues within the data.
 2.  **Select 3-4 Images Per Product:** For each product, curate a gallery of 3 to 4 of the best images.
 3.  **JSON Output Only:** Your entire response must be a single, valid JSON object, with no additional text.
 
-### Selection Principles
-For each product, select the best images by applying these principles:
+---
 
-1.  **Source Authority:** Prioritize images from official manufacturer domains (e.g., `apple.com`, `sony.com`) and major retailers. These are the most reliable sources for clean, professional studio shots suitable for a product page.
+### Guiding Principles for Selection
 
-2.  **Inferred Quality:**
-    - Favor high-resolution images (use `imageWidth` and `imageHeight` as your guide).
-    - Favor images with titles and URLs that suggest official product photos (e.g., "hero," "studio," color names).
-    - Avoid images with metadata suggesting editorial content (e.g., "review," "hands-on," "vs," "comparison").
+As an expert, use your intuition to weigh these signals and select the best image set for each product.
 
-3.  **Gallery Cohesion:**
-    - The goal is a clean gallery, not a collection of identical shots.
-    - Use clues in the `imageUrl` or `title` (e.g., "angle," "back," "side," or different numeric identifiers) to infer and select distinct views of the product.
-    - If no such clues exist, simply select the top 3-4 images based on the principles above, ensuring the URLs are unique.
+*   **Source is Key:** The most important signal is the `domain`. Give strong preference to the official manufacturer (e.g., `apple.com`, `sony.com`) and major retailers (e.g., `bestbuy.com`, `amazon.com`). These are the most reliable sources for clean, professional studio shots.
+
+*   **Initial Rank is a Strong Clue:** The first few results for a query (`position` 1-5) are often the most relevant. Use this as a strong starting point, but don't follow it blindly if a lower-ranked image from a better source is available.
+
+*   **Infer the "Studio Shot" Aesthetic:** Look for clues that indicate a professional product photo. Favor images with high resolution, roughly square or landscape aspect ratios (common for product cards), and filenames/titles that suggest a gallery (e.g., `hero`, `gallery_1`, `product_angle`). Avoid images with metadata suggesting editorial content (e.g., "review," "hands-on," "vs").
+
+*   **Validate the Image URL Path:** A valid URL will contain an image file extension (e.g., .jpg, .png, .webp) within its path, even if it is followed by query parameters (like ?v=... or &width=...). Distrust and reject URLs that clearly point to a webpage, characterized by endings like .html or path structures like /products/ or /p/ without a clear image file at the end.
+
+*   **Curate for Variety:** The final gallery should be cohesive. Use clues in the URLs or title (e.g., `_side`, `_back`, color names, different numbers) to select distinct views of the product, avoiding duplicate shots.
+
+*   **Extract the image URL from "imageUrl**: "imageUrl" is the only field you should use to get the actual image URL. Do not use any other fields for this purpose.
+---
 
 ### Input Data
 A JSON object containing the raw image search data will be provided.
@@ -349,42 +353,37 @@ A JSON object containing the raw image search data will be provided.
 {image_data_json}
 
 ### Output Command
-Generate a single JSON object containing the `curatedImages` array.
+Generate a single JSON object containing the `curatedImages` array, reflecting your expert merchandising decisions.
 """
 
 
 # Step 7b: Shopping Link Curation
-SHOPPING_CURATION_PROMPT = """You are an expert Commercial Merchandising AI. Your task is to analyze shopping search results and curate the most trustworthy purchase links for a given list of products.
+SHOPPING_CURATION_PROMPT = """
+// Role & Goal
+You are an expert shopping curator AI. Your goal is to analyze search results and select the most trustworthy and relevant purchase links for each product, up to a maximum of two.
 
-### Core Directives
-1.  **Comprehensive Coverage:** The output JSON must contain a `curatedShoppingLinks` array with an entry for every product in the input.
-2.  **Strict Adherence to Rules:** For each product, select up to two shopping links based on the hierarchy defined below.
-3.  **JSON Output Only:** The entire response must be a single, valid JSON object.
+// Guiding Principles for Link Selection
+1.  **Trust is Paramount:** Your selection must be based on source trustworthiness.
+    -   **Top Priority:** The official manufacturer's store (e.g., Apple.com, Dell.com). Actively seek this out.
+    -   **Second Priority:** Major, reputable national retailers (e.g., Best Buy, Amazon, Target, Walmart).
+    -   **Avoid:** Third-party marketplaces (like eBay), unknown shops, or untrustworthy sites.
 
-### Shopping Link Selection Rules
-For each product, evaluate its associated `shoppingData` and select links according to the following ordered criteria:
+2.  **Trust Search Position:** The top 1-3 search results for a product are usually the most reliable. Prioritize these unless you have clear evidence the source is untrustworthy (e.g., it's a known marketplace or an unfamiliar site).
 
-1.  **Product Condition Filter:**
-    - Only consider links for **new** products. Exclude any items whose `title` indicates a non-new condition (e.g., "used," "refurbished," "renewed," "pre-owned").
+3.  **Product Condition:** Select links for **new** items only. Discard any results that appear to be used, renewed, or refurbished.
 
-2.  **Source Prioritization:**
-    - From the filtered results, select up to two links based on the following source hierarchy:
-      - **a. Highest Priority:** The official manufacturer's store (e.g., "Apple", "Dell.com").
-      - **b. Secondary Priority:** Major, reputable national retailers (e.g., "Best Buy", "Target", "Amazon", "Walmart").
+4.  **No Good Link is Better Than a Bad One:** If no links meet these criteria, return an empty `shoppingLinks` array for that product.
 
-3.  **Guiding Principles:**
-    - **Integrity Over Availability:** If no links meet the specified criteria (new condition and trusted source), return an empty `shoppingLinks` array for that product. It is better to return no links than an untrustworthy one.
-    - **Trust as the Sole Metric:** Base selection exclusively on the source hierarchy and product condition. `price` and `delivery` data are not selection factors.
-    - **Exclusions:** Do not select links from third-party marketplaces (like eBay), unknown shops, or untrustworthy sites.
+5.  **Think, Don't Just Match:** Use your intelligence to identify the best source. Do not simply perform a keyword match on the source name.
 
-- **Output Fields:** For each selected link, include the `source`, `link`, `price`, and `delivery` fields from the original data.
+// Output Requirements
+-   The entire response must be a single, valid JSON object.
+-   The JSON must adhere strictly to the provided schema.
+-   The output `curatedShoppingLinks` array must contain an entry for every product in the input.
 
-### Input Data
-A JSON object containing the raw shopping search data will be provided.
-
-**User's Raw Data:**
+// Input Data
 {shopping_data_json}
 
-### Output Command
-Generate a single JSON object containing the `curatedShoppingLinks` array.
+// Output Command
+Generate the JSON output.
 """

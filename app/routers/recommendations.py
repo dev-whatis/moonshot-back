@@ -9,7 +9,7 @@ from typing import Dict
 # Import services and handlers
 from app.services import llm_calls, search_functions
 from app.services.logging_service import log_step, create_history_document, save_rejected_query
-from app.services.parsing_service import extract_product_names_from_markdown
+from app.services.parsing_service import extract_product_names_by_category
 
 # Import schemas (Pydantic models)
 from app.schemas import (
@@ -180,29 +180,42 @@ async def finalize_recommendation(
         finalize_log_payload["finalRecommendation"] = final_recommendations
         print(f"User {user_id} | Step 6 | Generated final recommendations")
         
-        # Step 6.5: Post-process the markdown to extract product names
-        product_names = extract_product_names_from_markdown(final_recommendations)
+        # --- MODIFICATION START ---
+        # Step 6.5: Post-process the markdown to extract product names by category
+        parsed_products = extract_product_names_by_category(final_recommendations)
+        product_names = parsed_products.get("productNames", [])
+        strategic_alternatives = parsed_products.get("strategicAlternatives", [])
+        
+        # Add both lists to the detailed GCS trace log
         finalize_log_payload["extractedProductNames"] = product_names
-        print(f"User {user_id} | Post-processing | Extracted {len(product_names)} product names.")
+        finalize_log_payload["extractedStrategicAlternatives"] = strategic_alternatives
+        print(f"User {user_id} | Post-processing | Extracted {len(product_names)} top products and {len(strategic_alternatives)} alternatives.")
+        # --- MODIFICATION END ---
 
         # --- LOGGING ON SUCCESS ---
         # Log the full finalize step trace to GCS
         background_tasks.add_task(log_step, conv_id, "02_finalize", finalize_log_payload)
         
-        # Create the initial history document in Firestore
+        # --- MODIFICATION START ---
+        # Create the initial history document in Firestore with the separated lists
         initial_history_payload = {
             "userId": user_id,
             "userQuery": user_query,
             "finalRecommendation": final_recommendations,
             "productNames": product_names,
+            "strategicAlternatives": strategic_alternatives,
         }
         background_tasks.add_task(create_history_document, conv_id, initial_history_payload)
+        # --- MODIFICATION END ---
         # --- END LOGGING ---
 
+        # --- MODIFICATION START ---
         return {
             "recommendations": final_recommendations,
-            "productNames": product_names
+            "productNames": product_names,
+            "strategicAlternatives": strategic_alternatives
         }
+        # --- MODIFICATION END ---
 
     except Exception as e:
         print(f"ERROR in /finalize for user {user_id}, conv_id: {conv_id}: {e}")

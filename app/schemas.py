@@ -112,7 +112,10 @@ class StartResponse(BaseModel):
 class RecommendationsResponse(BaseModel):
     """Data model for the /finalize endpoint response body."""
     recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
-    product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the report.")
+    product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the 'Top Recommendations' section.")
+    # --- MODIFICATION START ---
+    strategic_alternatives: List[str] = Field(..., alias="strategicAlternatives", description="A list of extracted product names from the 'Strategic Alternatives' section.")
+    # --- MODIFICATION END ---
 
     model_config = ConfigDict(
         alias_generator=to_camel,
