@@ -9,7 +9,7 @@ from google.genai import types
 from typing import List, Dict, Any
 
 from app.config import (
-    GEMINI_API_KEY, HIGH_MODEL_NAME, LOW_MODEL_NAME, DEFAULT_TEMPERATURE, THINKING_BUDGET
+    GEMINI_API_KEY, HIGH_MODEL_NAME, MID_MODEL_NAME, LOW_MODEL_NAME, DEFAULT_TEMPERATURE, THINKING_BUDGET
 )
 from app.prompts import (
     STEP0_GUARDRAIL_PROMPT,
@@ -112,7 +112,7 @@ def generate_search_queries(user_query: str, user_answers: list[dict]) -> list[s
         user_answers_json=json.dumps(user_answers, indent=2),
         current_year=current_year
     )
-    result = _make_stateless_call_json(HIGH_MODEL_NAME, prompt, REC_SEARCH_TERMS_SCHEMA)
+    result = _make_stateless_call_json(MID_MODEL_NAME, prompt, REC_SEARCH_TERMS_SCHEMA)
     return result.get("rec_search_terms", [])
 
 def select_recommendation_urls(user_query: str, user_answers: list[dict], rec_search_results: list) -> list[dict]:
@@ -128,7 +128,7 @@ def select_recommendation_urls(user_query: str, user_answers: list[dict], rec_se
         current_year=current_year,
         previous_year=previous_year
     )
-    result = _make_stateless_call_json(HIGH_MODEL_NAME, prompt, REC_SEARCH_URLS_SCHEMA)
+    result = _make_stateless_call_json(MID_MODEL_NAME, prompt, REC_SEARCH_URLS_SCHEMA)
     return result.get("rec_search_urls", [])
 
 def generate_final_recommendations(user_query: str, user_answers: list[dict], rec_scraped_contents: list) -> str:
@@ -150,7 +150,7 @@ def generate_final_recommendations(user_query: str, user_answers: list[dict], re
         )
         
         response = client.models.generate_content(
-            model=HIGH_MODEL_NAME,
+            model=MID_MODEL_NAME,
             contents=prompt,
             config=config
         )

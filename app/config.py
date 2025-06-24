@@ -37,7 +37,8 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY", "your_serper_api_key_here")
 # --- Gemini API Configuration ---
 # This is a secret and should be set in your .env file
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your_gemini_api_key_here")
-HIGH_MODEL_NAME = "gemini-2.5-flash"
+HIGH_MODEL_NAME = "gemini-2.5-pro"
+MID_MODEL_NAME = "gemini-2.5-flash"
 LOW_MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"
 
 # --- Model Configuration ---
