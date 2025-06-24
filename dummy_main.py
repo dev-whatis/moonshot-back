@@ -7,7 +7,7 @@ hardcoded data for each endpoint. It is intended for frontend development
 and testing when the real backend is not available or needed.
 
 To run:
-1. Make sure 'schemas.py' is in the same directory.
+1. Make sure the updated 'app/schemas.py' is available.
 2. Install dependencies: pip install -r requirements_dummy.txt
 3. Run the server: uvicorn dummy_main:app --reload
 """
@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # We import the same schemas to ensure the dummy data matches the real API contract.
+# These imports are updated to reflect the new structure.
 from app.schemas import (
     StartRequest,
     FinalizeRequest,
@@ -25,6 +26,8 @@ from app.schemas import (
     StartResponse,
     RecommendationsResponse,
     EnrichResponse,
+    BudgetQuestion,
+    DiagnosticQuestion
 )
 
 # ==============================================================================
@@ -35,54 +38,53 @@ from app.schemas import (
 # ==============================================================================
 
 # --- Data for the /start endpoint ---
+# This data now perfectly matches the structure of the StartResponse schema.
 DUMMY_START_RESPONSE = {
     "conversationId": f"dummy-conv-{uuid.uuid4()}",
-    "questions": [
-        {
-            "id": 1,
-            "question": "What is your approximate budget? (This is a dummy response)",
-            "type": "price",
-            "Options": None,
-            "isOther": None,
+    "budgetQuestion": {
+        "questionType": "price",
+        "question": "What is your approximate budget? (This is a dummy response)",
+        "price": {
             "min": None,
             "max": None,
-        },
-        {
-            "id": 2,
-            "question": "Which statement best describes your primary use for these headphones?",
-            "type": "single",
-            "Options": [
-                {"text": "Primarily for at-home focused listening or entertainment"},
-                {"text": "For commuting and travel, requiring portability and noise cancellation"},
-                {"text": "For fitness, needing sweat resistance and a secure fit"},
-                {"text": "For gaming, needing a microphone and surround sound"},
-            ],
-            "isOther": True,
-        },
-        {
-            "id": 3,
-            "question": "If you could perfect only ONE aspect of your headphones, which would it be?",
-            "type": "single",
-            "Options": [
-                {"text": "Absolute best sound quality, above all else"},
-                {"text": "Maximum noise cancellation to block out the world"},
-                {"text": "All-day comfort and a lightweight design"},
-                {"text": "Ultimate durability and build quality"},
-            ],
-            "isOther": False,
-        },
-        {
-            "id": 4,
-            "question": "Which of these features are important to you? (select all that apply)",
-            "type": "multi",
-            "Options": [
-                {"text": "Wireless connectivity (Bluetooth)"},
-                {"text": "A built-in microphone for calls"},
-                {"text": "Long battery life (15+ hours)"},
-            ],
-            "isOther": True,
         }
-    ],
+    },
+    "diagnosticQuestions": [
+        {
+            "questionType": "single",
+            "question": "Which statement best describes your primary use for these headphones?",
+            "description": "This helps determine if you need features like noise cancellation for travel or a high-quality microphone for gaming.",
+            "options": [
+                {"text": "At-home focused listening", "description": "Prioritizes pure sound quality in a quiet environment."},
+                {"text": "Commuting and travel", "description": "Prioritizes noise cancellation and portability."},
+                {"text": "Fitness and exercise", "description": "Prioritizes sweat resistance and a secure fit."},
+                {"text": "Gaming", "description": "Prioritizes a built-in microphone and surround sound."},
+                {"text": "other", "description": "Please specify if your use case is not listed."}
+            ]
+        },
+        {
+            "questionType": "single",
+            "question": "If you could perfect only ONE aspect of your headphones, which would it be?",
+            "description": "Understanding your absolute top priority helps us make the right trade-offs in recommendations.",
+            "options": [
+                {"text": "Absolute best sound quality", "description": "Sound fidelity is more important than any other feature."},
+                {"text": "Maximum noise cancellation", "description": "Blocking out the world is the most critical function."},
+                {"text": "All-day comfort", "description": "A lightweight, comfortable design for long sessions is key."},
+                {"text": "Ultimate durability", "description": "Build quality and longevity are the most important factors."}
+            ]
+        },
+        {
+            "questionType": "multi",
+            "question": "Which of these features are important to you? (select all that apply)",
+            "description": "Select any additional features that are must-haves for your new headphones.",
+            "options": [
+                {"text": "Wireless connectivity", "description": "Connect via Bluetooth without any cables."},
+                {"text": "A built-in microphone for calls", "description": "Essential for taking phone or video calls."},
+                {"text": "Long battery life (15+ hours)", "description": "Ensures your headphones last all day on a single charge."},
+                {"text": "Other", "description": "Please specify if you have other must-have features."}
+            ]
+        }
+    ]
 }
 
 
@@ -260,9 +262,14 @@ async def dummy_start_recommendation(request: StartRequest):
 @app.post("/api/recommendations/finalize", response_model=RecommendationsResponse, tags=["Dummy Recommendations"])
 async def dummy_finalize_recommendation(request: FinalizeRequest):
     """
-    Returns a hardcoded recommendation report. Ignores the request body.
+
+    Returns a hardcoded recommendation report. Ignores the request body but prints it.
     """
-    print(f"Received /finalize request for conv_id: '{request.conversation_id}'. Returning dummy report.")
+    print(f"Received /finalize request for conv_id: '{request.conversation_id}'.")
+    # Log the received answers to the console to help with frontend debugging
+    print("User answers received:")
+    # The .model_dump() method provides a clean dictionary representation of the Pydantic models
+    print(request.model_dump(by_alias=True)['userAnswers'])
     time.sleep(2)  # Add a small delay to simulate processing time
     return DUMMY_FINALIZE_RESPONSE
 

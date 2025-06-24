@@ -25,37 +25,52 @@ class StartRequest(BaseModel):
     )
 
 
-class BudgetAnswer(BaseModel):
-    """Data model for a price range answer provided by the user."""
-    min: Optional[float] = None
-    max: Optional[float] = None
+# --- New Answer Models for FinalizeRequest ---
+
+class AnswerOption(BaseModel):
+    """Data model for a single selected option within a user's answer."""
+    text: str = Field(..., description="The concise label for the option.")
+    description: str = Field(..., description="A short explanation of this choice.")
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
     )
 
-class UserAnswer(BaseModel):
+class PriceAnswer(BaseModel):
     """
-    Data model for a single Question & Answer pair provided by the user.
-    This model is flexible to handle different answer types from the new questionnaire.
+    Data model for the user's answer to the budget question.
+    It includes the original question text for full context.
     """
+    question_type: Literal["price"] = Field(..., alias="questionType")
     question: str = Field(..., description="The exact question text that was asked.")
-    question_type: Literal["price", "single", "multi"] = Field(
-        ..., alias="questionType", description="The type of question that was asked."
-    )
-    is_other: Optional[bool] = Field(
-        False, alias="isOther", description="True if the user selected an 'Other' option to provide a custom value."
-    )
-    answer: Union[str, List[str], BudgetAnswer] = Field(
-        ..., description="The user's answer, formatted based on the question type."
-    )
-
+    min: Optional[float] = Field(None, description="The minimum budget selected by the user.")
+    max: Optional[float] = Field(None, description="The maximum budget selected by the user.")
+    
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
     )
 
+class DiagnosticAnswer(BaseModel):
+    """
+    Data model for the user's answer to a single or multi-choice question.
+    This structure mirrors the DiagnosticQuestion model, but replaces the full
+    list of 'options' with the user's selected 'userAnswers'.
+    """
+    question_type: Literal["single", "multi"] = Field(..., alias="questionType")
+    question: str = Field(..., description="The exact question text that was asked.")
+    description: str = Field(..., description="The explanation of why this question was important.")
+    user_answers: List[AnswerOption] = Field(
+        ..., alias="userAnswers", description="A list of the option(s) the user selected."
+    )
+    
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+# --- Updated FinalizeRequest to use the new answer models ---
 class FinalizeRequest(BaseModel):
     """Data model for the /finalize endpoint request body."""
     conversation_id: Optional[str] = Field(
@@ -64,8 +79,8 @@ class FinalizeRequest(BaseModel):
     user_query: str = Field(
         ..., alias="userQuery", description="The original user query, passed back by the client."
     )
-    user_answers: List[UserAnswer] = Field(
-        ..., description="A list of the user's answers to the questionnaire."
+    user_answers: List[Union[PriceAnswer, DiagnosticAnswer]] = Field(
+        ..., alias="userAnswers", description="A list of the user's answers, matching the new rich format."
     )
 
     model_config = ConfigDict(

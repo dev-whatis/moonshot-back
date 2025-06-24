@@ -42,7 +42,7 @@ MID_MODEL_NAME = "gemini-2.5-flash"
 LOW_MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17"
 
 # --- Model Configuration ---
-DEFAULT_TEMPERATURE = 0.8
+DEFAULT_TEMPERATURE = 1
 THINKING_BUDGET = -1
 
 # --- Google Cloud Project Configuration ---
