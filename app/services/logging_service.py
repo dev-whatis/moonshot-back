@@ -90,8 +90,8 @@ def create_history_document(conversation_id: Optional[str], initial_data: Dict[s
         # Add creation timestamp and conversation ID to the document
         initial_data["createdAt"] = firestore.SERVER_TIMESTAMP
         initial_data["conversationId"] = conversation_id
-        doc_ref.set(initial_data)
-        print(f"Successfully CREATED history doc for conv_id {conversation_id} in Firestore.")
+        doc_ref.set(initial_data, merge=True)
+        print(f"Successfully UPSERTED initial history for conv_id {conversation_id} in Firestore.")
     except Exception as e:
         print(f"ERROR: Failed to CREATE history doc in Firestore for conv_id {conversation_id}: {e}")
 
@@ -115,8 +115,8 @@ def update_history_with_enrichment(conversation_id: Optional[str], enriched_prod
             "enrichedProducts": enriched_products,
             "updatedAt": firestore.SERVER_TIMESTAMP
         }
-        doc_ref.update(update_payload)
-        print(f"Successfully UPDATED history doc for conv_id {conversation_id} in Firestore.")
+        doc_ref.set(update_payload, merge=True)
+        print(f"Successfully UPSERTED enrichment data for conv_id {conversation_id} in Firestore.")
     except Exception as e:
         print(f"ERROR: Failed to UPDATE history doc in Firestore for conv_id {conversation_id}: {e}")
 
