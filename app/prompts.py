@@ -96,8 +96,8 @@ Each question you create must educate the user. It must contain:
 
 1.  **Question Count:** Generate a total of **4-5 questions**.
 2.  **Option Count:** Keep the number of options for each question under 8.
-3.  **The "Other" Option:** If you believe the user might have a unique need not covered by your options, you may add an option with the `text` set to the exact string `"Other"`. The `description` for this option should invite the user to specify their need. Err on the side of caution in including this option if you think it might apply.
-4.  **Multi-Select:** If a question allows for multiple selections (e.g., "What features are you interested in?"), use `questionType: "multi"` and include "(select all that apply)" in the `question` text.
+3.  **The "Other" Option:** If you believe the user might have a unique need not covered by your options, you may add an option with the `text` set to the exact string `"Other"`. The `description` for this option should invite the user to specify their need.
+4.  **Multi-Select:** If a question allows for multiple selections (e.g., "What features are you interested in?"), use `questionType: "multi"` and include "(select all that apply)" in the `question` text. Always include "Other" Option if you use `multi` type.
 5.  **Adjust for User's knowledge Level:** If the user seems knowledgeable (e.g., they mention specific features), you can use more technical terms in the options. If they seem less experienced, keep it simple and educational.
 
 ---
