@@ -25,13 +25,11 @@ class StartRequest(BaseModel):
     )
 
 
-class PriceAnswer(BaseModel):
-    """Data model for a price range answer."""
+class BudgetAnswer(BaseModel):
+    """Data model for a price range answer provided by the user."""
     min: Optional[float] = None
     max: Optional[float] = None
 
-    # This config allows the model to accept camelCase JSON
-    # and map it to snake_case attributes.
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
@@ -40,12 +38,18 @@ class PriceAnswer(BaseModel):
 class UserAnswer(BaseModel):
     """
     Data model for a single Question & Answer pair provided by the user.
+    This model is flexible to handle different answer types from the new questionnaire.
     """
     question: str = Field(..., description="The exact question text that was asked.")
-    type: Literal["single", "multi", "price"] = Field(..., description="The type of question that was asked.")
-    is_other: Optional[bool] = Field(False, alias="isOther", description="True if the user provided a custom 'other' value.")
-    
-    answer: Union[str, List[str], PriceAnswer] = Field(..., description="The user's answer, formatted based on the question type.")
+    question_type: Literal["price", "single", "multi"] = Field(
+        ..., alias="questionType", description="The type of question that was asked."
+    )
+    is_other: Optional[bool] = Field(
+        False, alias="isOther", description="True if the user selected an 'Other' option to provide a custom value."
+    )
+    answer: Union[str, List[str], BudgetAnswer] = Field(
+        ..., description="The user's answer, formatted based on the question type."
+    )
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -54,11 +58,15 @@ class UserAnswer(BaseModel):
 
 class FinalizeRequest(BaseModel):
     """Data model for the /finalize endpoint request body."""
-    # --- MODIFICATION START ---
-    conversation_id: Optional[str] = Field(None, alias="conversationId", description="The unique ID for the conversation flow. Optional for local testing.")
-    user_query: str = Field(..., alias="userQuery", description="The original user query, passed back by the client.")
-    # --- MODIFICATION END ---
-    user_answers: List[UserAnswer] = Field(..., description="A list of the user's answers to the questionnaire.")
+    conversation_id: Optional[str] = Field(
+        None, alias="conversationId", description="The unique ID for the conversation flow. Optional for local testing."
+    )
+    user_query: str = Field(
+        ..., alias="userQuery", description="The original user query, passed back by the client."
+    )
+    user_answers: List[UserAnswer] = Field(
+        ..., description="A list of the user's answers to the questionnaire."
+    )
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -67,10 +75,12 @@ class FinalizeRequest(BaseModel):
 
 class EnrichRequest(BaseModel):
     """Data model for the /enrich endpoint request body."""
-    # --- MODIFICATION START ---
-    conversation_id: Optional[str] = Field(None, alias="conversationId", description="The ID of the recommendation conversation this enrichment is for. Optional for local testing.")
-    # --- MODIFICATION END ---
-    product_names: List[str] = Field(..., alias="productNames", description="A list of product names to be enriched with images and shopping links.")
+    conversation_id: Optional[str] = Field(
+        None, alias="conversationId", description="The ID of the recommendation conversation this enrichment is for. Optional for local testing."
+    )
+    product_names: List[str] = Field(
+        ..., alias="productNames", description="A list of product names to be enriched with images and shopping links."
+    )
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -80,42 +90,59 @@ class EnrichRequest(BaseModel):
 
 # --- Response Models ---
 
-class QuestionOption(BaseModel):
-    """Data model for a single MCQ option. The client is responsible for assigning letters (A, B, C) or numbers."""
-    text: str
-
-class Question(BaseModel):
-    """
-    Data model for a single question sent to the user.
-    """
-    id: int
-    question: str
-    type: Literal["single", "multi", "price"]
-    Options: Optional[List[QuestionOption]] = None
-    is_other: Optional[bool] = Field(None, alias="isOther", description="For single/multi questions, true if a free-text 'Other' option is appropriate.")
+class BudgetObject(BaseModel):
+    """Data model for the extracted budget values."""
     min: Optional[float] = None
     max: Optional[float] = None
 
-# --- MODIFICATION START: Replaced QuestionsResponse with StartResponse ---
-class StartResponse(BaseModel):
-    """Data model for the /start endpoint response body."""
-    conversation_id: str = Field(..., alias="conversationId")
-    questions: List[Question]
+class BudgetQuestion(BaseModel):
+    """Data model for the budget-specific question."""
+    question_type: Literal["price"] = Field(..., alias="questionType")
+    question: str
+    price: BudgetObject
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
     )
-# --- MODIFICATION END ---
+
+class DiagnosticQuestionOption(BaseModel):
+    """Data model for an option within a diagnostic question."""
+    text: str = Field(..., description="The concise label for the option.")
+    description: str = Field(..., description="A short explanation of this choice.")
+
+class DiagnosticQuestion(BaseModel):
+    """Data model for a single diagnostic (non-budget) question."""
+    question_type: Literal["single", "multi"] = Field(..., alias="questionType")
+    question: str
+    description: str = Field(..., description="An explanation of why this question is important.")
+    options: List[DiagnosticQuestionOption]
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class StartResponse(BaseModel):
+    """
+    Data model for the /start endpoint response body, containing the full
+    questionnaire split into budget and diagnostic sections.
+    """
+    conversation_id: str = Field(..., alias="conversationId")
+    budget_question: BudgetQuestion = Field(..., alias="budgetQuestion")
+    diagnostic_questions: List[DiagnosticQuestion] = Field(..., alias="diagnosticQuestions")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
 class RecommendationsResponse(BaseModel):
     """Data model for the /finalize endpoint response body."""
     recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
     product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the 'Top Recommendations' section.")
-    # --- MODIFICATION START ---
     strategic_alternatives: List[str] = Field(..., alias="strategicAlternatives", description="A list of extracted product names from the 'Strategic Alternatives' section.")
-    # --- MODIFICATION END ---
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -129,7 +156,6 @@ class StopResponse(BaseModel):
 
 class RejectionResponse(BaseModel):
     """
-
     Data model for the structured rejection response sent to the client
     when the user's query is out-of-scope.
     """
@@ -189,50 +215,83 @@ GUARDRAIL_RESPONSE_SCHEMA = {
 # have been removed as they are no longer in use.
 
 
-# Step 3: MCQ Generation
-MCQ_QUESTIONS_SCHEMA = {
+# Step 3a: Budget Question Generation
+BUDGET_QUESTION_SCHEMA = {
+  "type": "object",
+  "properties": {
+    "questionType": {
+      "type": "string",
+      "description": "The type of question, which is always 'price' for this step.",
+      "enum": ["price"]
+    },
+    "question": {
+      "type": "string",
+      "description": "The budget-related question to ask the user. This text will vary based on whether a budget was found in the initial query."
+    },
+    "price": {
+      "type": "object",
+      "description": "The budget values extracted from the query.",
+      "properties": {
+        "min": {
+          "type": "number",
+          "nullable": True,
+          "description": "The minimum budget. Use null if not specified."
+        },
+        "max": {
+          "type": "number",
+          "nullable": True,
+          "description": "The maximum budget. Use null if not specified."
+        }
+      },
+      "required": ["min","max"]
+    }
+  },
+  "required": ["questionType","question","price"]
+}
+
+# Step 3b: Diagnostic Question Generation
+DIAGNOSTIC_QUESTIONS_SCHEMA = {
     "type": "object",
     "properties": {
         "questions": {
             "type": "array",
-            "description": "An array of 3-6 questions to ask the user.",
+            "description": "An array of 3-4 non-budget-related questions to ask the user.",
             "items": {
                 "type": "object",
                 "properties": {
-                    "id": {"type": "integer"},
-                    "question": {"type": "string"},
-                    "type": {
+                    "questionType": {
                         "type": "string",
                         "description": "The type of question.",
-                        "enum": ["single", "multi", "price"]
+                        "enum": ["single", "multi"]
                     },
-                    "Options": {
+                    "question": {
+                        "type": "string",
+                        "description": "The main text of the question presented to the user."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "A brief explanation of why this question is important, educating the user on the key consideration it addresses."
+                    },
+                    "options": {
                         "type": "array",
-                        "description": "List of choices for 'single' or 'multi' questions. Omit for 'price'.",
+                        "description": "A list of choices for the question.",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "text": {"type": "string"}
+                                "text": {
+                                    "type": "string",
+                                    "description": "The concise label for the option (e.g., 'All-day Comfort')."
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "A short explanation of this specific choice, often highlighting a key benefit or trade-off."
+                                }
                             },
-                            "required": ["text"]
+                            "required": ["text", "description"]
                         }
-                    },
-                    "isOther": {
-                        "type": "boolean",
-                        "description": "For 'single'/'multi', set to true if a free-text 'Other' option is appropriate. Omit for 'price'."
-                    },
-                    "min": {
-                        "type": "number",
-                        "nullable": True,
-                        "description": "For 'price' questions, the pre-populated minimum. Omit for other types."
-                    },
-                    "max": {
-                        "type": "number",
-                        "nullable": True,
-                        "description": "For 'price' questions, the pre-populated maximum. Omit for other types."
                     }
                 },
-                "required": ["id", "question", "type"]
+                "required": ["questionType", "question", "description", "options"]
             }
         }
     },

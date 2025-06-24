@@ -13,7 +13,8 @@ from app.config import (
 )
 from app.prompts import (
     STEP0_GUARDRAIL_PROMPT,
-    STEP3_MCQ_GENERATION_PROMPT,
+    STEP3A_BUDGET_PROMPT,
+    STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT,
     STEP4_SEARCH_QUERY_PROMPT,
     STEP5_WEBSITE_SELECTION_PROMPT,
     STEP6_FINAL_RECOMMENDATIONS_PROMPT,
@@ -22,7 +23,8 @@ from app.prompts import (
 )
 from app.schemas import (
     GUARDRAIL_RESPONSE_SCHEMA,
-    MCQ_QUESTIONS_SCHEMA,
+    BUDGET_QUESTION_SCHEMA,
+    DIAGNOSTIC_QUESTIONS_SCHEMA,
     REC_SEARCH_TERMS_SCHEMA,
     REC_SEARCH_URLS_SCHEMA,
     IMAGE_CURATION_SCHEMA,
@@ -82,12 +84,22 @@ def run_query_guardrail(user_query: str) -> dict:
             "reason": "Could not process the request due to an internal error."
         }
 
-def generate_mcq_questions(user_query: str) -> list[dict]:
+def generate_budget_question(user_query: str) -> dict:
     """
-    Step 3: Generate MCQ questions using the LLM's internal knowledge (with thinking mode).
+    Step 3a: Generates a single budget question by analyzing the user's query.
+    Uses a low-cost model for this simple, focused task.
     """
-    prompt = STEP3_MCQ_GENERATION_PROMPT.format(user_query=user_query)
-    result = _make_stateless_call_json(HIGH_MODEL_NAME, prompt, MCQ_QUESTIONS_SCHEMA, use_thinking=True)
+    prompt = STEP3A_BUDGET_PROMPT.format(user_query=user_query)
+    return _make_stateless_call_json(LOW_MODEL_NAME, prompt, BUDGET_QUESTION_SCHEMA)
+
+
+def generate_diagnostic_questions(user_query: str) -> list[dict]:
+    """
+    Step 3b: Generates 3-4 educational, non-budget diagnostic questions.
+    Uses a high-cost model with thinking mode for this complex reasoning task.
+    """
+    prompt = STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT.format(user_query=user_query)
+    result = _make_stateless_call_json(HIGH_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA, use_thinking=True)
     return result.get("questions", [])
 
 def generate_search_queries(user_query: str, user_answers: list[dict]) -> list[str]:

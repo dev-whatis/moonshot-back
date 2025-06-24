@@ -31,68 +31,84 @@ Output your classification in the specified JSON format:"""
 # STEP1_SEARCH_TERM_PROMPT and STEP2_LINK_SELECTION_PROMPT have been removed.
 # --- MODIFICATION END ---
 
-# Step 3: MCQ Generation (with thinking mode)
-STEP3_MCQ_GENERATION_PROMPT = """You are a master product consultant and expert questionnaire designer. Your primary goal is to diagnose a user's true needs and priorities through a series of smart, insightful questions. This is not a simple feature checklist; it's a diagnostic conversation to build a rich user profile. The questions you design should also subtly educate the user about the key trade-offs in their product category.
+# Step 3a: Budget Question Generation
+STEP3A_BUDGET_PROMPT = """You are an expert shopping assistant tasked with clarifying a user's budget. Your goal is to analyze their request and formulate a single, precise question to either ask for or confirm their budget.
 
-You will generate a dynamic questionnaire of 3-5 questions based on the user's initial request and your deep internal knowledge of the product category.
+**Your Task:**
 
-### The Philosophy of Smart Questioning
+Analyze the user's shopping query to identify any mention of price or budget. Based on your analysis, you must generate a single, well-formed JSON object.
 
-To extract the most valuable information, your questions (after the budget) must follow these principles:
+**Guiding Scenarios & Examples:**
 
-**1. Prioritize Context Over Specifications:**
-Ask about *how* and *why* the user will use the product, not just *what* features they want. Infer technical needs from their real-world scenarios.
-*   **Weak Question:** "What screen size do you want for your laptop?" (Asks for a spec)
-*   **Smart Question:** "Which statement best describes your typical day with this laptop?" (Options describe scenarios like "Mostly at a desk connected to a monitor" vs. "Moving between classes, running on battery").
+1.  **When no budget is mentioned:** Your primary job is to ask for it.
+    *   **For a query like:** "I need a good laptop for college."
+    *   **Your logic should be:** The user hasn't provided a budget. I need to ask for one politely.
+    *   **Resulting values:**
+        *   `question`: "What is your approximate budget? (You can leave this blank if you're not sure)."
+        *   `price.min`: `null`
+        *   `price.max`: `null`
 
-**2. Force Trade-Offs to Reveal Priorities:**
-No product is perfect. A great question often reveals what the user is willing to *compromise* on. This is critical for the final recommendation.
-*   **Weak Question:** "What features are important in your headphones?" (Allows user to select everything)
-*   **Smart Question:** "If you could perfect only ONE aspect of your headphones, which would it be?" (Options force a choice between "Absolute best sound quality," "Maximum noise cancellation," "All-day comfort," or "Ultimate portability").
+2.  **When a maximum budget is mentioned:** Your job is to confirm this limit.
+    *   **For a query like:** "best headphones under $150"
+    *   **Your logic should be:** The user set a maximum price. I should confirm this is correct.
+    *   **Resulting values:**
+        *   `question`: "I see you're looking for something under $150. Is that correct, or would you like to adjust your budget?"
+        *   `price.min`: `null`
+        *   `price.max`: `150`
 
-**3. Uncover the 'Why' (Pain Points & Goals):**
-Discover the user's core motivation. What problem are they trying to solve?
-*   **Weak Question:** "What type of coffee maker do you want?" (Asks for a category)
-*   **Smart Question:** "What's the biggest frustration with your current coffee routine?" (Options reveal pain points like "It takes too long," "The taste is bland," or "Cleanup is a nightmare").
+3.  **When an approximate budget is mentioned:** Your job is to propose a reasonable range and confirm it. A good rule of thumb is to create a range of +/- 20% around the mentioned price.
+    *   **For a query like:** "looking for a 4k tv around $1000"
+    *   **Your logic should be:** The user gave an approximate figure. I will create a sensible range around it and ask if it works for them.
+    *   **Resulting values:**
+        *   `question`: "Based on your request, I've set a budget from $800 to $1200. Does that sound about right?"
+        *   `price.min`: `800`
+        *   `price.max`: `1200`
 
-**4. Educate Through Options:**
-Use the answer choices to introduce the user to the key decision-making frameworks for the product.
-*   **Weak Question:** "Are you a beginner or expert photographer?"
-*   **Smart Question:** "Which approach to photography are you most excited about?" (Options explain different philosophies like "Getting great shots easily on auto" vs. "Mastering manual controls for creative effects" vs. "Shooting high-quality video and photos").
+---
+**User's Query:** "{user_query}"
+
+Based on the query above, generate the required JSON object.
+"""
+
+# Step 3b: Diagnostic Question Generation (with thinking mode)
+STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT = """You are an expert product consultant with access to an internal library of comprehensive buying guides for every product imaginable. Your task is to act as a "Buying Guide to Questionnaire Converter."
+
+### Your Process
+
+1.  **Identify Product Category:** First, identify the product category from the user's query (e.g., 'laptops', 'hiking shoes', 'coffee makers').
+2.  **Consult Internal Guide:** Access your internal knowledge—your "buying guide"—for that specific category.
+3.  **Find Key Decision Points:** From the guide, identify the most critical factors a person must consider before buying that product.
+4.  **Convert to Questions:** Convert each critical decision point into an educational, multiple-choice question that helps you understand the user's needs and teaches them what to look for.
+
+**CRITICAL RULE: You must NOT ask about the budget or price.** Your focus is solely on the user's needs and priorities.
+
+### The Educational Question Structure
+
+Each question you create must educate the user. It must contain:
+
+1.  **The Question (`question`):** The direct question to the user.
+2.  **The "Why" (`description`):** A brief explanation of *why this question is important* for this product category.
+3.  **The Options (`options`):** Each option must also be educational, with:
+    *   **Option Label (`text`):** A short, clear label for the choice.
+    *   **Option Meaning (`description`):** A simple explanation of what this choice prioritizes.
+
+### Rules for Question Design
+
+1.  **Question Count:** Generate a total of **4-5 questions**.
+2.  **Option Count:** Keep the number of options for each question under 8.
+3.  **The "Other" Option:** If you believe the user might have a unique need not covered by your options, you may add an option with the `text` set to the exact string `"Other"`. The `description` for this option should invite the user to specify their need.
+4.  **Multi-Select:** If a question allows for multiple selections (e.g., "What features are you interested in?"), use `questionType: "multi"` and include "(select all that apply)" in the `question` text.
+5.  **Adjust for User's knowledge Level:** If the user seems knowledgeable (e.g., they mention specific features), you can use more technical terms in the options. If they seem less experienced, keep it simple and educational.
 
 ---
 
-### Core Rules and Output Format
+### Your Task
 
-1.  **Question Types:** You must use one of three formats:
-    *   `price`: For budget only. Has `min` and `max` fields.
-    *   `single`: Standard multiple-choice where only one answer is correct.
-    *   `multi`: Multiple-choice where several options can be selected.
+**User's initial query:** "{user_query}"
 
-2.  **Budget First (Critical):**
-    *   The very first question (`id: 1`) MUST ALWAYS be `type: "price"`.
-    *   Analyze the `user_query` for any budget mention.
-    *   **No budget mentioned:** Ask for it. `min` and `max` are `null`. Question: "What is your approximate budget? (Leave blank if you don't have a specific budget in mind)"
-    *   **Budget mentioned (e.g., "under $800"):** Confirm it. Set `max` to the value, `min` to `null`. Question: "We've set your maximum budget to $800 based on your request. Does that sound right, or would you like to adjust it?"
-    *   **(Handle other budget variations like 'around' or 'over' as specified previously).**
+Following the "buying guide" process and rules above, generate a list of 4-5 non-budget-related questions.
 
-3.  **Content-Driven Questions (`id > 1`):**
-    *   Apply the "Philosophy of Smart Questioning" to create the remaining questions.
-    *   Order them from most to least important for diagnosing the user's needs.
-    *   Use `type: "multi"` for "check all that apply" style questions (e.g., "Which of these devices will you connect?"). Always include "select all that apply" in the question text.
-    *   Use `type: "single"` for questions that force a priority choice.
-
-4.  **The `isOther` Field:**
-    *   Include the boolean field `isOther: true` for `single` or `multi` questions if you believe the user might have a unique need not covered by the options.
-    *   Do NOT add "Other" as a text choice in the `Options` array.
-
-### Input Data
-
-User's initial query: "{user_query}"
-
-### Output Command
-
-Generate the full list of questions in the specified JSON format. Your goal is to create a diagnostic tool, not a simple checklist. The quality of these questions determines the success of the entire recommendation.
+Output the full list of questions in the specified JSON format.
 """
 
 # Step 4: Search Query Generation
