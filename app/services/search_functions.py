@@ -25,7 +25,7 @@ def _scrape_url(url: str) -> str:
             'X-API-KEY': SERPER_API_KEY,
             'Content-Type': 'application/json'
         }
-        payload = {"url": url}
+        payload = {"url": url, "includeMarkdown": True}
 
         with httpx.Client(timeout=20.0) as client: # Add a reasonable timeout
             response = client.post("https://scrape.serper.dev/", json=payload, headers=headers)

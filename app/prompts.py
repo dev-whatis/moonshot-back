@@ -70,7 +70,7 @@ Analyze the user's shopping query to identify any mention of price or budget. Ba
 Based on the query above, generate the required JSON object.
 """
 
-# Step 3b: Diagnostic Question Generation (with thinking mode)
+# Step 3b: Diagnostic Question Generation
 STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT = """You are an expert product consultant with access to an internal library of comprehensive buying guides for every product imaginable. Your task is to act as a "Buying Guide to Questionnaire Converter."
 
 ### Your Process
@@ -78,7 +78,10 @@ STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT = """You are an expert product consultant wit
 1.  **Identify Product Category:** First, identify the product category from the user's query (e.g., 'laptops', 'hiking shoes', 'coffee makers').
 2.  **Consult Internal Guide:** Access your internal knowledge—your "buying guide"—for that specific category.
 3.  **Find Key Decision Points:** From the guide, identify the most critical factors a person must consider before buying that product.
-4.  **Convert to Questions:** Convert each critical decision point into an educational, multiple-choice question that helps you understand the user's needs and teaches them what to look for.
+4.  **Inffer Implicit and Explicit Information from the User's Query:** Use any explicit information from the user's query to tailor the questions. For example, if the user mentions "gaming laptop," you know they care about performance and graphics.
+5.  **Assess User's Knowledge Level:** Consider the user's expertise level based on their query and tailor the questions accordingly.
+5.  **Convert to Questions:** Convert each critical decision point into an educational, multiple-choice question that helps you understand the user's needs and teaches them what to look for.
+
 
 **CRITICAL RULE: You must NOT ask about the budget or price.** Your focus is solely on the user's needs and priorities.
 
@@ -234,6 +237,7 @@ STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product analyst and recommenda
 ### Core Directives:
 
 1.  **Evidence is Authority:** Every claim, feature, and drawback mentioned MUST be directly traceable to the provided `Expert Review Data`. Do not invent or infer information.
+2.  **Always try to include exact product names and models** in your recommendations. Add appropriate suffixes to the end of the product names if they are ambigious to know just by the name (e.g., "Perennial Southside Blonde" should be "Perennial Southside Blonde beer").
 2.  **User-Centric Analysis:** Your entire report must be framed around the `User Profile`. Continuously explain *why* a product feature is relevant to *that specific user*.
 3.  **Honest Assessment:** If the provided data shows that no products meet the user's critical, non-negotiable requirements, you MUST NOT recommend anything. Instead, you will use the "No Direct Match Found" format specified below.
 4.  **Acknowledge Uncertainty:** If the reviews lack information on a key user priority, you must explicitly state that this information was not available in the sources provided. This builds credibility.

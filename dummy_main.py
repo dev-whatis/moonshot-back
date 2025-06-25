@@ -270,7 +270,7 @@ async def dummy_finalize_recommendation(request: FinalizeRequest):
     print("User answers received:")
     # The .model_dump() method provides a clean dictionary representation of the Pydantic models
     print(request.model_dump(by_alias=True)['userAnswers'])
-    time.sleep(30)  # Add a small delay to simulate processing time
+    time.sleep(15)  # Add a small delay to simulate processing time
     return DUMMY_FINALIZE_RESPONSE
 
 
