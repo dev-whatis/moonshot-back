@@ -1,129 +1,140 @@
 """
-(search_functions.py) Search and scraping functions using Serper API
+(search_functions.py) Search and scraping functions.
+- Uses Tavily for the main recommendation search/scrape.
+- Uses Serper for the enrichment (image/shopping) searches.
 """
 import httpx
 import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
 
+# Import Tavily client and API key
+from tavily import TavilyClient
+from app.config import TAVILY_API_KEY
+
+# Import Serper key and other configs for enrichment functions
 from app.config import SERPER_API_KEY, MAX_CONCURRENT_REQUESTS
 
-# --- Function to scrape a single URL using Serper API ---
-def _scrape_url(url: str) -> str:
+
+# ==============================================================================
+# Recommendation Flow Functions (Using Tavily)
+# ==============================================================================
+
+def _search_single_tavily_query(term: str) -> Dict[str, Any]:
     """
-    Helper function to scrape a URL using Serper API. This must be called
-    one URL at a time.
+    Helper function to perform a single search query using the Tavily client.
+    This function is designed to be called in parallel.
+    """
+    print(f"Tavily: Searching for '{term}'")
+    try:
+        client = TavilyClient(api_key=TAVILY_API_KEY)
+        response = client.search(
+            query=term,
+            search_depth="advanced",
+            max_results=10,
+            country="united states"
+        )
+        # The Tavily response format is already what we want to pass on.
+        return response
+    except Exception as e:
+        print(f"ERROR: Tavily search for term '{term}' failed: {e}")
+        # Return a structured error response that won't crash the calling loop
+        return {"query": term, "results": []}
+
+
+def search_product_recommendations(rec_search_terms: List[str]) -> List[Dict[str, Any]]:
+    """
+    Step 4.5: Search for product recommendations using parallel Tavily API calls.
     
     Args:
-        url (str): URL to scrape.
+        rec_search_terms (List[str]): List of search terms for finding product recommendations.
     
     Returns:
-        str: Scraped text content, or an empty string on failure.
+        List[Dict[str, Any]]: A list of Tavily search result objects, one for each term.
     """
-    try:
-        headers = {
-            'X-API-KEY': SERPER_API_KEY,
-            'Content-Type': 'application/json'
-        }
-        payload = {"url": url, "includeMarkdown": True}
-
-        with httpx.Client(timeout=20.0) as client: # Add a reasonable timeout
-            response = client.post("https://scrape.serper.dev/", json=payload, headers=headers)
-            response.raise_for_status()
-            scrape_result = response.json()
-        
-        return scrape_result.get("text", "")
-        
-    except httpx.HTTPStatusError as e:
-        print(f"Error scraping URL {url}: HTTP {e.response.status_code} - {e.response.text}")
-        return ""
-    except Exception as e:
-        print(f"An unexpected error occurred while scraping URL {url}: {e}")
-        return ""
-
-
-# --- MODIFICATION START: OPTIMIZED BATCH SEARCH ---
-
-def search_product_recommendations(rec_search_terms: list) -> list:
-    """
-    Step 4.5: Search for product recommendations using a single BATCH request (OPTIMIZED).
+    print(f"Performing parallel Tavily search for {len(rec_search_terms)} recommendation terms.")
     
-    Args:
-        rec_search_terms (list): List of search terms for finding product recommendations.
-    
-    Returns:
-        list: A list of search result objects, formatted to match the application's
-              expected structure: [{"query": str, "results": list}, ...].
-    """
-    print(f"Performing batch Google search for recommendation terms: {rec_search_terms}")
-    headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
-    # Create a list of query objects for the batch request
-    payload = json.dumps([{"q": term} for term in rec_search_terms])
-    
-    try:
-        with httpx.Client(timeout=30.0) as client:
-            response = client.post("https://google.serper.dev/search", content=payload, headers=headers)
-            response.raise_for_status()
-        
-        # The result is a list of search result objects, one for each query
-        batch_results = response.json()
-        
-        # Transform the raw batch response to the format expected by the rest of the application
-        formatted_results = []
-        for result in batch_results:
-            original_query = result.get('searchParameters', {}).get('q', 'unknown')
-            organic_results = result.get('organic', [])
-            formatted_results.append({
-                "query": original_query,
-                "results": organic_results
-            })
-        
-        return formatted_results
-
-    except httpx.HTTPStatusError as e:
-        print(f"Error during batch Google search: HTTP {e.response.status_code} - {e.response.text}")
-        return []
-    except Exception as e:
-        print(f"An unexpected error occurred during batch Google search: {e}")
+    if not rec_search_terms:
         return []
 
-# --- MODIFICATION END ---
-
-
-def _scrape_single_recommendation_url(url_obj: dict) -> dict:
-    """Helper function for parallel scraping of recommendation URLs."""
-    url = url_obj["url"]
-    title = url_obj["title"]
-    
-    print(f"Scraping: {title} - {url}")
-    scraped_text = _scrape_url(url)
-    
-    return {
-        "title": title,
-        "url": url,
-        "text": scraped_text if scraped_text else f"Failed to scrape content from {url}"
-    }
-
-def scrape_recommendation_urls(rec_search_urls: list) -> list:
-    """
-    Step 5.5: Scrape content from selected product recommendation URLs (PARALLELIZED).
-    This function remains unchanged as scraping must be done one URL at a time.
-    
-    Args:
-        rec_search_urls (list): List of URL objects with title and url keys.
-    
-    Returns:
-        list: Scraped content from each URL.
-    """
-    print(f"Scraping recommendation URLs: {[url_obj['url'] for url_obj in rec_search_urls]}")
-    
+    results = []
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
-        # Process all URLs in parallel
-        scraped_contents = list(executor.map(_scrape_single_recommendation_url, rec_search_urls))
+        # Map each search term to the search function
+        future_to_term = {executor.submit(_search_single_tavily_query, term): term for term in rec_search_terms}
+        
+        for future in future_to_term:
+            try:
+                result = future.result()
+                results.append(result)
+            except Exception as e:
+                term = future_to_term[future]
+                print(f"ERROR: An exception was raised for Tavily search term '{term}': {e}")
+                # Append a failure object to maintain list size if needed, but it's handled in the helper
     
-    return scraped_contents
+    print(f"Tavily search completed. Got results for {len(results)} terms.")
+    return results
 
-# --- Functions for the Enrichment feature (already optimized) ---
+
+def scrape_recommendation_urls(rec_search_urls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Step 5.5: Scrape content from selected product recommendation URLs using a single
+    batch request to the Tavily `extract` API.
+    
+    Args:
+        rec_search_urls (List[Dict[str, Any]]): A list of objects selected by the LLM, each containing at least 'title' and 'url'.
+    
+    Returns:
+        List[Dict[str, Any]]: A list of objects with 'title', 'url', and 'text' (scraped content).
+    """
+    print(f"Performing batch scrape of {len(rec_search_urls)} URLs with Tavily.")
+
+    if not rec_search_urls:
+        return []
+    
+    # Extract just the URLs for the batch API call
+    urls_to_scrape = [item['url'] for item in rec_search_urls]
+    
+    try:
+        client = TavilyClient(api_key=TAVILY_API_KEY)
+        # Make a single batch call to the extract endpoint
+        scraped_data = client.extract(
+            urls=urls_to_scrape,
+            extract_depth="advanced"
+        )
+        
+        # Create a lookup map for efficient merging: {url: scraped_content}
+        content_map = {
+            result['url']: result.get('raw_content', '')
+            for result in scraped_data['results']
+        }
+        
+        # Merge the scraped content back with the original titles
+        final_scraped_contents = []
+        for original_item in rec_search_urls:
+            url = original_item['url']
+            scraped_text = content_map.get(url, f"Failed to scrape content from {url}")
+            
+            final_scraped_contents.append({
+                "title": original_item.get("title", "No Title"),
+                "url": url,
+                "text": scraped_text
+            })
+            
+        print("Tavily batch scrape and merge completed successfully.")
+        return final_scraped_contents
+
+    except Exception as e:
+        print(f"An unexpected error occurred during Tavily batch scrape: {e}")
+        # If the whole batch fails, return a list with failure messages for each URL
+        return [
+            {"title": item.get("title"), "url": item['url'], "text": f"Scraping failed due to an API error: {e}"}
+            for item in rec_search_urls
+        ]
+
+
+# ==============================================================================
+# Enrichment Flow Functions (Still Using Serper) - UNCHANGED
+# ==============================================================================
 
 def search_images_for_products(product_names: List[str]) -> List[Dict[str, Any]]:
     """
@@ -135,16 +146,14 @@ def search_images_for_products(product_names: List[str]) -> List[Dict[str, Any]]
     Returns:
         A list of Serper's raw image search results for each product.
     """
-    print(f"Performing batch image search for: {product_names}")
+    print(f"Serper: Performing batch image search for: {product_names}")
     headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
-    # Create a list of query objects for the batch request
     payload = json.dumps([{"q": name, "num": 10} for name in product_names])
     
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.post("https://google.serper.dev/images", content=payload, headers=headers)
             response.raise_for_status()
-        # The result is a list of search result objects, one for each query
         return response.json()
     except httpx.HTTPStatusError as e:
         print(f"Error during batch image search: HTTP {e.response.status_code} - {e.response.text}")
@@ -163,16 +172,14 @@ def search_shopping_for_products(product_names: List[str]) -> List[Dict[str, Any
     Returns:
         A list of Serper's raw shopping search results for each product.
     """
-    print(f"Performing batch shopping search for: {product_names}")
+    print(f"Serper: Performing batch shopping search for: {product_names}")
     headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
-    # Create a list of query objects for the batch request
     payload = json.dumps([{"q": name} for name in product_names])
     
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.post("https://google.serper.dev/shopping", content=payload, headers=headers)
             response.raise_for_status()
-        # The result is a list of search result objects, one for each query
         return response.json()
     except httpx.HTTPStatusError as e:
         print(f"Error during batch shopping search: HTTP {e.response.status_code} - {e.response.text}")
@@ -194,20 +201,15 @@ def fetch_enrichment_data(product_names: List[str]) -> List[Dict[str, Any]]:
         and its corresponding raw image and shopping data.
     """
     with ThreadPoolExecutor(max_workers=2) as executor:
-        # Submit both the image and shopping batch searches to run in parallel
         future_images = executor.submit(search_images_for_products, product_names)
         future_shopping = executor.submit(search_shopping_for_products, product_names)
         
-        # Wait for both batch calls to complete and get their results
         image_results = future_images.result()
         shopping_results = future_shopping.result()
 
-    # Create a dictionary to map product names to their results for easy aggregation
-    # The query field in the Serper response lets us map results back to the original name
     image_map = {result.get('searchParameters', {}).get('q'): result.get('images', []) for result in image_results}
     shopping_map = {result.get('searchParameters', {}).get('q'): result.get('shopping', []) for result in shopping_results}
     
-    # Aggregate the data into the final structure
     aggregated_data = []
     for name in product_names:
         aggregated_data.append({
@@ -216,5 +218,5 @@ def fetch_enrichment_data(product_names: List[str]) -> List[Dict[str, Any]]:
             "shoppingData": shopping_map.get(name, [])
         })
         
-    print(f"Successfully aggregated enrichment data for {len(product_names)} products.")
+    print(f"Serper: Successfully aggregated enrichment data for {len(product_names)} products.")
     return aggregated_data

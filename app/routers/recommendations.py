@@ -193,6 +193,7 @@ async def finalize_recommendation(
         final_recommendations = llm_calls.generate_final_recommendations(
             user_query=user_query,
             user_answers=user_answers_dict,
+            rec_search_results=rec_search_results,
             rec_scraped_contents=rec_scraped_contents
         )
         finalize_log_payload["finalRecommendation"] = final_recommendations

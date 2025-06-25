@@ -255,7 +255,10 @@ STEP6_FINAL_RECOMMENDATIONS_PROMPT = """You are a product analyst and recommenda
 *   **Initial Request:** "{user_query}"
 *   **Detailed Needs (from questionnaire):** {user_answers_json}
 
-**2. Expert Review Data:**
+**2. Search Results from Multiple Queries:**
+{rec_search_results_json}
+
+**3. Expert Review Data:**
 {rec_scraped_contents_json}
 
 ---

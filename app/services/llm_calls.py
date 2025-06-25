@@ -131,7 +131,7 @@ def select_recommendation_urls(user_query: str, user_answers: list[dict], rec_se
     result = _make_stateless_call_json(MID_MODEL_NAME, prompt, REC_SEARCH_URLS_SCHEMA)
     return result.get("rec_search_urls", [])
 
-def generate_final_recommendations(user_query: str, user_answers: list[dict], rec_scraped_contents: list) -> str:
+def generate_final_recommendations(user_query: str, user_answers: list[dict], rec_search_results: list, rec_scraped_contents: list) -> str:
     """
     Step 6: Generate final product recommendations (with thinking mode).
     This call expects a raw text response and handles it directly.
@@ -141,6 +141,7 @@ def generate_final_recommendations(user_query: str, user_answers: list[dict], re
         prompt = STEP6_FINAL_RECOMMENDATIONS_PROMPT.format(
             user_query=user_query,
             user_answers_json=json.dumps(user_answers, indent=2),
+            rec_search_results_json=json.dumps(rec_search_results, indent=2),
             rec_scraped_contents_json=json.dumps(rec_scraped_contents, indent=2)
         )
         
