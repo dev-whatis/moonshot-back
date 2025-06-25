@@ -10,24 +10,24 @@ import os
 # --- Development & Testing Flags ---
 # Set to True for production to enforce conversationId and enable logging.
 # Set to False for local testing to make conversationId optional and disable logging.
-CONVERSATION_ID_ENABLED = False
+CONVERSATION_ID_ENABLED = True
 
 # --- Firebase Configuration ---
 # Set to False for local testing to bypass token verification.
 # In production, this should be True.
-AUTH_ENABLED = False
+AUTH_ENABLED = True
 
 # Path to your Firebase service account key JSON file.
 
 # For production environments (using Google Cloud Secret Manager)
 
-# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
+FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
 
 # For local testing
 # The `firebase-service-account.json` file should be in the root directory.
 # Uncomment the line below to use a local service account key file.
 
-FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
+# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
 
 
 # --- Serper API Configuration ---
