@@ -5,18 +5,20 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from google.cloud import firestore
 
 # Import services and handlers
-from app.services import llm_calls, search_functions
+from app.services import llm_calls
 from app.services.logging_service import log_step, create_history_document, save_rejected_query
-from app.services.parsing_service import extract_product_names_by_category
-
-# Import schemas (Pydantic models)
+# --- MODIFICATION: Import the new service and schemas ---
+from app.services.recommendation_service import run_recommendation_flow
 from app.schemas import (
     StartRequest,
     FinalizeRequest,
     StartResponse,
-    RecommendationsResponse,
+    FinalizeResponse,
+    StatusResponse,
+    ResultResponse,
     RejectionResponse
 )
 
@@ -145,94 +147,113 @@ async def start_recommendation(
         )
 
 
-@router.post("/finalize", response_model=RecommendationsResponse)
+# --- MODIFICATION START: The /finalize endpoint is now asynchronous ---
+
+@router.post(
+    "/finalize",
+    response_model=FinalizeResponse,
+    status_code=status.HTTP_202_ACCEPTED
+)
 async def finalize_recommendation(
     request: FinalizeRequest,
     background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user)
 ):
     """
-    Finalizes the recommendation flow using the state provided by the client.
-    On full success, logs the entire flow to GCS and creates a history document in Firestore.
+    Accepts the user's answers and starts the recommendation generation as a
+    background job. This endpoint returns immediately with a 202 Accepted
+    response, providing the conversationId to be used for polling.
     """
     conv_id = request.conversation_id
-    print(f"Finalizing recommendation for user: {user_id}, conv_id: {conv_id}")
-    
-    finalize_log_payload = {}
-    
+    print(f"Finalize job accepted for user: {user_id}, conv_id: {conv_id}. Starting background task.")
+
+    # 1. Create the initial document in Firestore to track the job's state.
+    initial_history_payload = {
+        "userId": user_id,
+        "userQuery": request.user_query
+    }
+    create_history_document(conv_id, initial_history_payload)
+
+    # 2. Schedule the long-running task to execute in the background.
+    background_tasks.add_task(run_recommendation_flow, request, user_id)
+
+    # 3. Return immediately to the client.
+    return {"conversation_id": conv_id}
+
+
+# --- NEW ENDPOINT: Poll for job status ---
+@router.get(
+    "/status/{conversation_id}",
+    response_model=StatusResponse
+)
+async def get_job_status(
+    conversation_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Poll this endpoint to get the current status of a recommendation job.
+    """
     try:
-        # The .dict() method on the new UserAnswer model correctly serializes it for logging and LLM calls
-        user_answers_dict = [answer.model_dump(by_alias=True) for answer in request.user_answers]
-        finalize_log_payload["userAnswers"] = user_answers_dict
-        user_query = request.user_query
+        # We need a direct Firestore client instance here to read the status
+        firestore_client = firestore.Client()
+        doc_ref = firestore_client.collection("histories").document(conversation_id)
+        doc = doc_ref.get()
 
-        # Step 4: Generate search queries for recommendations
-        rec_search_terms = llm_calls.generate_search_queries(
-            user_query=user_query, 
-            user_answers=user_answers_dict
-        )
-        finalize_log_payload["recSearchTerms"] = rec_search_terms
-        print(f"User {user_id} | Step 4 | Generated {len(rec_search_terms)} search queries")
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Conversation not found.")
 
-        # Step 4.5: Search for product recommendations
-        rec_search_results = search_functions.search_product_recommendations(rec_search_terms)
+        # Ensure the user requesting status is the one who created the job
+        if doc.to_dict().get("userId") != user_id:
+             raise HTTPException(status_code=403, detail="Forbidden")
 
-        # Step 5: Select best recommendation URLs
-        rec_urls = llm_calls.select_recommendation_urls(
-            user_query=user_query,
-            user_answers=user_answers_dict,
-            rec_search_results=rec_search_results
-        )
-        finalize_log_payload["selectedRecUrls"] = rec_urls
-        print(f"User {user_id} | Step 5 | Selected {len(rec_urls)} recommendation sources")
+        return {"status": doc.to_dict().get("status", "unknown")}
 
-        # Step 5.5: Scrape recommendation content
-        rec_scraped_contents = search_functions.scrape_recommendation_urls(rec_urls)
-
-        # Step 6: Generate final recommendations
-        final_recommendations = llm_calls.generate_final_recommendations(
-            user_query=user_query,
-            user_answers=user_answers_dict,
-            rec_search_results=rec_search_results,
-            rec_scraped_contents=rec_scraped_contents
-        )
-        finalize_log_payload["finalRecommendation"] = final_recommendations
-        print(f"User {user_id} | Step 6 | Generated final recommendations")
-        
-        # Step 6.5: Post-process the markdown to extract product names by category
-        parsed_products = extract_product_names_by_category(final_recommendations)
-        product_names = parsed_products.get("productNames", [])
-        strategic_alternatives = parsed_products.get("strategicAlternatives", [])
-        
-        finalize_log_payload["extractedProductNames"] = product_names
-        finalize_log_payload["extractedStrategicAlternatives"] = strategic_alternatives
-        print(f"User {user_id} | Post-processing | Extracted {len(product_names)} top products and {len(strategic_alternatives)} alternatives.")
-
-        # --- LOGGING ON SUCCESS ---
-        background_tasks.add_task(log_step, conv_id, "02_finalize", finalize_log_payload)
-        
-        initial_history_payload = {
-            "userId": user_id,
-            "userQuery": user_query,
-            "finalRecommendation": final_recommendations,
-            "productNames": product_names,
-            "strategicAlternatives": strategic_alternatives,
-        }
-        background_tasks.add_task(create_history_document, conv_id, initial_history_payload)
-        # --- END LOGGING ---
-
-        return {
-            "recommendations": final_recommendations,
-            "productNames": product_names,
-            "strategicAlternatives": strategic_alternatives
-        }
-
+    except HTTPException as http_exc:
+        raise http_exc # Re-raise FastAPI's own exceptions
     except Exception as e:
-        print(f"ERROR in /finalize for user {user_id}, conv_id: {conv_id}: {e}")
-        finalize_log_payload["error"] = str(e)
-        background_tasks.add_task(log_step, conv_id, "02_finalize_failure", finalize_log_payload)
+        print(f"ERROR fetching status for conv_id {conversation_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve job status.")
 
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred during the finalize process: {e}"
-        )
+
+# --- NEW ENDPOINT: Fetch the final results ---
+@router.get(
+    "/result/{conversation_id}",
+    response_model=ResultResponse
+)
+async def get_job_result(
+    conversation_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Fetch the final results of a completed recommendation job.
+    """
+    try:
+        firestore_client = firestore.Client()
+        doc_ref = firestore_client.collection("histories").document(conversation_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Conversation not found.")
+
+        data = doc.to_dict()
+
+        # Ensure the user requesting the result is the one who created the job
+        if data.get("userId") != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+        # Check if the job is actually complete
+        if data.get("status") != "complete":
+            raise HTTPException(status_code=422, detail=f"Job status is '{data.get('status')}'. Result is not ready.")
+
+        # --- MODIFICATION: Construct the simpler final result ---
+        # Construct and return the final result
+        return {
+            "recommendations": data.get("recommendations", ""),
+            "productNames": data.get("productNames", []),
+        }
+
+    except HTTPException as http_exc:
+        raise http_exc # Re-raise FastAPI's own exceptions
+    except Exception as e:
+        print(f"ERROR fetching result for conv_id {conversation_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve job result.")

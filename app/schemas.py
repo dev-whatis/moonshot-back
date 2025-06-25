@@ -105,6 +105,39 @@ class EnrichRequest(BaseModel):
 
 # --- Response Models ---
 
+# NEW MODEL for the asynchronous /finalize endpoint response
+class FinalizeResponse(BaseModel):
+    """
+    Data model for the immediate, asynchronous response from the POST /finalize endpoint.
+    It acknowledges the request and provides the ID to poll for status.
+    """
+    conversation_id: str = Field(..., alias="conversationId")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+# NEW MODEL for the status polling endpoint
+class StatusResponse(BaseModel):
+    """
+    Data model for the GET /status/{conversation_id} endpoint, providing the
+    current state of the background job.
+    """
+    status: str = Field(..., description="The current status of the job (e.g., 'processing', 'complete', 'failed').")
+
+
+# RENAMED from RecommendationsResponse to ResultResponse
+class ResultResponse(BaseModel):
+    """Data model for the GET /result/{conversation_id} endpoint response."""
+    recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
+    product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the Report.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
 class BudgetObject(BaseModel):
     """Data model for the extracted budget values."""
     min: Optional[float] = None
@@ -146,18 +179,6 @@ class StartResponse(BaseModel):
     conversation_id: str = Field(..., alias="conversationId")
     budget_question: BudgetQuestion = Field(..., alias="budgetQuestion")
     diagnostic_questions: List[DiagnosticQuestion] = Field(..., alias="diagnosticQuestions")
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-
-class RecommendationsResponse(BaseModel):
-    """Data model for the /finalize endpoint response body."""
-    recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
-    product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the 'Top Recommendations' section.")
-    strategic_alternatives: List[str] = Field(..., alias="strategicAlternatives", description="A list of extracted product names from the 'Strategic Alternatives' section.")
 
     model_config = ConfigDict(
         alias_generator=to_camel,

@@ -24,7 +24,9 @@ from app.schemas import (
     FinalizeRequest,
     EnrichRequest,
     StartResponse,
-    RecommendationsResponse,
+    FinalizeResponse,      # New
+    StatusResponse,        # New
+    ResultResponse,        # Renamed
     EnrichResponse,
     BudgetQuestion,
     DiagnosticQuestion
@@ -128,7 +130,7 @@ Below is a detailed analysis of the best options based on expert data.
 Your decision hinges on balancing premium, "endgame-level" audio and build quality with potentially higher costs (Focal Utopia, Monolith M565C) against highly durable and comfortable, yet more budget-conscious, alternatives (Sony MDR-7506, Hifiman HE400SE). Each recommended product directly addresses your core needs for all-day comfort and durability for at-home focused listening. This report aims to empower you to make an informed choice based on verified expert insights.
 """
 
-DUMMY_FINALIZE_RESPONSE = {
+DUMMY_RESULT_RESPONSE = {
     "recommendations": DUMMY_FINALIZE_MARKDOWN,
     "productNames": [],
     "strategicAlternatives": ["Sony MDR-7506", "Hifiman HE400SE"],
@@ -259,19 +261,77 @@ async def dummy_start_recommendation(request: StartRequest):
     return response_data
 
 
-@app.post("/api/recommendations/finalize", response_model=RecommendationsResponse, tags=["Dummy Recommendations"])
+# --- MODIFICATION: New global state to track dummy jobs ---
+# This dictionary will store the state of our "in-progress" jobs.
+# The key is the conversation_id.
+# The value is a dictionary like: {"status": "processing", "startTime": 12345.67}
+dummy_jobs = {}
+
+# The time in seconds the dummy finalize job should take to "complete".
+DUMMY_PROCESSING_TIME_SECONDS = 30
+
+
+@app.post("/api/recommendations/finalize", response_model=FinalizeResponse, status_code=202, tags=["Dummy Recommendations"])
 async def dummy_finalize_recommendation(request: FinalizeRequest):
     """
-
-    Returns a hardcoded recommendation report. Ignores the request body but prints it.
+    Accepts the finalize request, logs it, and simulates starting a background job.
+    Returns immediately with a 202 Accepted.
     """
-    print(f"Received /finalize request for conv_id: '{request.conversation_id}'.")
+    conv_id = request.conversation_id
+    print(f"Received /finalize request for conv_id: '{conv_id}'. Simulating job start.")
     # Log the received answers to the console to help with frontend debugging
     print("User answers received:")
-    # The .model_dump() method provides a clean dictionary representation of the Pydantic models
     print(request.model_dump(by_alias=True)['userAnswers'])
-    time.sleep(15)  # Add a small delay to simulate processing time
-    return DUMMY_FINALIZE_RESPONSE
+    
+    # Store the job's state
+    dummy_jobs[conv_id] = {
+        "status": "processing",
+        "startTime": time.time()
+    }
+    
+    return {"conversationId": conv_id}
+
+
+@app.get("/api/recommendations/status/{conversation_id}", response_model=StatusResponse, tags=["Dummy Recommendations"])
+async def dummy_get_job_status(conversation_id: str):
+    """
+    Checks the status of a simulated job.
+    """
+    job = dummy_jobs.get(conversation_id)
+
+    if not job:
+        # This case is unlikely if the frontend flow is correct, but good to have.
+        return {"status": "failed"}
+
+    if job["status"] == "complete":
+        return {"status": "complete"}
+
+    # Check if the processing time has elapsed
+    if time.time() - job["startTime"] > DUMMY_PROCESSING_TIME_SECONDS:
+        job["status"] = "complete" # Update the state to complete
+        print(f"Job for conv_id '{conversation_id}' is now complete.")
+        return {"status": "complete"}
+    else:
+        # If not enough time has passed, it's still processing
+        return {"status": "processing"}
+
+
+@app.get("/api/recommendations/result/{conversation_id}", response_model=ResultResponse, tags=["Dummy Recommendations"])
+async def dummy_get_job_result(conversation_id: str):
+    """
+    Returns the hardcoded recommendation report if the job is 'complete'.
+    """
+    job = dummy_jobs.get(conversation_id)
+    
+    # Only return the result if the job is marked as complete
+    if job and job.get("status") == "complete":
+        print(f"Returning final result for conv_id: '{conversation_id}'.")
+        return DUMMY_RESULT_RESPONSE
+    else:
+        # This simulates the real backend's 422 error if the result is not ready.
+        # We'll just return an empty object for simplicity in the dummy.
+        print(f"Result for conv_id '{conversation_id}' was requested, but job is not complete.")
+        return ResultResponse(recommendations="Error: Result not ready.", productNames=[], strategicAlternatives=[])
 
 
 @app.post("/api/enrich", response_model=EnrichResponse, tags=["Dummy Enrichment"])

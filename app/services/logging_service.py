@@ -71,11 +71,11 @@ def log_step(conversation_id: Optional[str], step_name: str, step_data: Dict[str
     except Exception as e:
         print(f"ERROR: Failed to save GCS log for conv_id {conversation_id}, step {step_name}: {e}")
 
+# --- MODIFICATION START ---
 def create_history_document(conversation_id: Optional[str], initial_data: Dict[str, Any]):
     """
-    Creates the initial user-facing history document in Firestore.
-    This function will do nothing if CONVERSATION_ID_ENABLED is False or if
-    no conversation_id is provided.
+    Creates the initial user-facing history document in Firestore at the
+    start of the /finalize job, setting its initial status to 'processing'.
     """
     if not CONVERSATION_ID_ENABLED or not conversation_id:
         print("INFO: Firestore history creation skipped (disabled by config or no ID).")
@@ -87,19 +87,64 @@ def create_history_document(conversation_id: Optional[str], initial_data: Dict[s
         
     try:
         doc_ref = firestore_client.collection("histories").document(conversation_id)
-        # Add creation timestamp and conversation ID to the document
+        # Add creation timestamp, conversation ID, and initial status to the document
         initial_data["createdAt"] = firestore.SERVER_TIMESTAMP
         initial_data["conversationId"] = conversation_id
-        doc_ref.set(initial_data, merge=True)
-        print(f"Successfully UPSERTED initial history for conv_id {conversation_id} in Firestore.")
+        initial_data["status"] = "processing" # Set initial status
+        doc_ref.set(initial_data) # Use .set() to create the document
+        print(f"Successfully CREATED initial history for conv_id {conversation_id} in Firestore with status 'processing'.")
     except Exception as e:
         print(f"ERROR: Failed to CREATE history doc in Firestore for conv_id {conversation_id}: {e}")
+
+# --- NEW FUNCTION ---
+def set_job_complete(conversation_id: Optional[str], result_payload: Dict[str, Any]):
+    """
+    Updates a history document when a background job completes successfully.
+    """
+    if not CONVERSATION_ID_ENABLED or not conversation_id:
+        return
+    if not firestore_client:
+        return
+
+    try:
+        doc_ref = firestore_client.collection("histories").document(conversation_id)
+        # Prepare the final payload with the status and results
+        final_payload = {
+            "status": "complete",
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+            **result_payload
+        }
+        doc_ref.update(final_payload)
+        print(f"Successfully updated job status to 'complete' for conv_id {conversation_id}.")
+    except Exception as e:
+        print(f"ERROR: Failed to update job to 'complete' in Firestore for conv_id {conversation_id}: {e}")
+
+# --- NEW FUNCTION ---
+def set_job_failed(conversation_id: Optional[str], error_message: str):
+    """
+    Updates a history document when a background job fails.
+    """
+    if not CONVERSATION_ID_ENABLED or not conversation_id:
+        return
+    if not firestore_client:
+        return
+
+    try:
+        doc_ref = firestore_client.collection("histories").document(conversation_id)
+        failure_payload = {
+            "status": "failed",
+            "error": error_message,
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        }
+        doc_ref.update(failure_payload)
+        print(f"Successfully updated job status to 'failed' for conv_id {conversation_id}.")
+    except Exception as e:
+        print(f"ERROR: Failed to update job to 'failed' in Firestore for conv_id {conversation_id}: {e}")
 
 def update_history_with_enrichment(conversation_id: Optional[str], enriched_products: list):
     """
     Updates an existing history document with enriched product data.
-    This function will do nothing if CONVERSATION_ID_ENABLED is False or if
-    no conversation_id is provided.
+    This now uses .update() as the document is guaranteed to exist.
     """
     if not CONVERSATION_ID_ENABLED or not conversation_id:
         print("INFO: Firestore history update skipped (disabled by config or no ID).")
@@ -115,10 +160,13 @@ def update_history_with_enrichment(conversation_id: Optional[str], enriched_prod
             "enrichedProducts": enriched_products,
             "updatedAt": firestore.SERVER_TIMESTAMP
         }
-        doc_ref.set(update_payload, merge=True)
-        print(f"Successfully UPSERTED enrichment data for conv_id {conversation_id} in Firestore.")
+        # Use .update() instead of .set(merge=True) for clarity and correctness
+        doc_ref.update(update_payload)
+        print(f"Successfully UPDATED enrichment data for conv_id {conversation_id} in Firestore.")
     except Exception as e:
         print(f"ERROR: Failed to UPDATE history doc in Firestore for conv_id {conversation_id}: {e}")
+# --- MODIFICATION END ---
+
 
 def save_rejected_query(rejection_data: dict):
     """
