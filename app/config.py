@@ -10,24 +10,24 @@ import os
 # --- Development & Testing Flags ---
 # Set to True for production to enforce conversationId and enable logging.
 # Set to False for local testing to make conversationId optional and disable logging.
-CONVERSATION_ID_ENABLED = True
+CONVERSATION_ID_ENABLED = False
 
 # --- Firebase Configuration ---
 # Set to False for local testing to bypass token verification.
 # In production, this should be True.
-AUTH_ENABLED = True
+AUTH_ENABLED = False
 
 # Path to your Firebase service account key JSON file.
 
 # For production environments (using Google Cloud Secret Manager)
 
-FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
+# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
 
 # For local testing
 # The `firebase-service-account.json` file should be in the root directory.
 # Uncomment the line below to use a local service account key file.
 
-# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
+FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
 
 
 # --- Serper API Configuration ---
@@ -53,6 +53,10 @@ GCS_BUCKET_NAME = "moonshot-69420-llm-traces"
 
 # Maximum number of concurrent requests for parallel scraping/searching
 MAX_CONCURRENT_REQUESTS = 5
+
+
+# A new flag to control the LLM enrichment method (set False to bypass LLM enrichment).
+USE_LLM_FOR_ENRICHMENT = False
 
 # For teh LLM enrichment process
 # PRODUCT_CHUNK_SIZE: How many products to include in a single LLM call.

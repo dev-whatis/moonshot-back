@@ -99,7 +99,7 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
     Uses a high-cost model with thinking mode for this complex reasoning task.
     """
     prompt = STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT.format(user_query=user_query)
-    result = _make_stateless_call_json(HIGH_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA, use_thinking=True)
+    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA)
     return result.get("questions", [])
 
 def generate_search_queries(user_query: str, user_answers: list[dict]) -> list[str]:

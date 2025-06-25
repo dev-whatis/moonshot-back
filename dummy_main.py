@@ -130,7 +130,7 @@ Your decision hinges on balancing premium, "endgame-level" audio and build quali
 
 DUMMY_FINALIZE_RESPONSE = {
     "recommendations": DUMMY_FINALIZE_MARKDOWN,
-    "productNames": ["Focal Utopia", "Monolith by Monoprice M565C"],
+    "productNames": [],
     "strategicAlternatives": ["Sony MDR-7506", "Hifiman HE400SE"],
 }
 
@@ -270,7 +270,7 @@ async def dummy_finalize_recommendation(request: FinalizeRequest):
     print("User answers received:")
     # The .model_dump() method provides a clean dictionary representation of the Pydantic models
     print(request.model_dump(by_alias=True)['userAnswers'])
-    time.sleep(2)  # Add a small delay to simulate processing time
+    time.sleep(30)  # Add a small delay to simulate processing time
     return DUMMY_FINALIZE_RESPONSE
 
 
