@@ -11,7 +11,7 @@ from google.cloud import firestore
 from app.services import llm_calls
 from app.services.logging_service import log_step, create_history_document, save_rejected_query
 # --- MODIFICATION: Import the new service and schemas ---
-from app.services.recommendation_service import run_recommendation_flow
+from app.services.recommendation_service import run_recon_and_deep_dive_flow
 from app.schemas import (
     StartRequest,
     FinalizeRequest,
@@ -175,7 +175,7 @@ async def finalize_recommendation(
     create_history_document(conv_id, initial_history_payload)
 
     # 2. Schedule the long-running task to execute in the background.
-    background_tasks.add_task(run_recommendation_flow, request, user_id)
+    background_tasks.add_task(run_recon_and_deep_dive_flow, request, user_id)
 
     # 3. Return immediately to the client.
     return {"conversation_id": conv_id}

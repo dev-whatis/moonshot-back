@@ -114,121 +114,116 @@ Following the "buying guide" process and rules above, generate a list of 4-5 non
 Output the full list of questions in the specified JSON format.
 """
 
-# Step 4: Search Query Generation
-STEP4_SEARCH_QUERY_PROMPT = """You are an expert research analyst specializing in product discovery. Your critical task is to analyze a user's structured profile and create a portfolio of 3-5 strategic Google search queries.
+# Step R2: Research Strategy Generation
+STEP_R2_RESEARCH_STRATEGIST_PROMPT = """You are a world-class Research Strategist and expert shopper. Your mission is to analyze an initial, broad "reconnaissance" web search and, based on a user's specific needs, devise a brilliant "deep-dive" research plan. You are not answering the user's question directly; you are the architect of the research that will lead to the answer.
 
-The goal is **not** to create one "perfect" query. Instead, you will generate a complementary set of queries that work together to gather diverse evidence:
-1.  **Broad "Best Of" lists** to identify market consensus.
-2.  **Deep-dive analyses** focusing on the user's specific, high-priority features.
-3.  **Value and alternative comparisons** that explore budget and trade-offs.
+Your analysis follows a strict three-step process.
 
-This multi-angle approach is essential for gathering the high-quality evidence needed to write the final, evidence-based recommendation report.
+### Step 1: Feasibility Assessment
+First, look at the user's detailed needs (their answers to the questionnaire) and their budget. Compare this to the general landscape presented in the reconnaissance search results. Are their expectations realistic?
+- If their needs and budget align well with the products mentioned in the search results, your assessment should be a simple confirmation (e.g., "The user's request is feasible. Standard top-tier products in this category align with their budget and primary needs.")
+- If you spot a clear conflict (e.g., they want a feature that is only available in products far outside their budget), you must state the conflict clearly. (e.g., "The user's request for a professional-grade 8K video editing laptop under $1000 is highly challenging. The initial search suggests such features are typically found in machines costing over $2000.")
 
-### The Strategic Query Portfolio Method
+### Step 2: Gap Identification
+Now, perform a critical analysis. The reconnaissance search provides a generic overview. Your job is to find what's MISSING. Compare the user's *specific, high-priority answers* from the questionnaire against the broad talking points in the search snippets. Identify 2-3 key themes, questions, or priorities that are not adequately addressed.
+- Good Gaps to Identify:
+  - A specific feature priority (e.g., "The user is highly focused on 'all-day battery life,' but the initial search results don't provide specific battery-hour comparisons.")
+  - A specific pain point (e.g., "The user mentioned their current coffee maker is 'hard to clean,' and none of the search snippets address the cleaning process.")
+  - A key trade-off (e.g., "The user is deciding between portability and screen size, and the results don't offer a direct comparison for this use case.")
 
-1.  **Holistically Analyze the User Profile:** First, review all the user's answers. Identify their primary use case, budget, non-negotiable priorities (e.g., "all-day battery life"), and any stated frustrations (e.g., "my current one is too slow").
-
-2.  **Generate a Query Portfolio (3-5 Queries):** Use your expert judgment to select and craft the most relevant query types from the list below. You must always start with the "Baseline Query."
-
-    *   **Type 1: The Baseline Query (Always Include)**
-        *   **Purpose:** To find popular, mainstream buying guides and establish a list of top contenders.
-        *   **Formula:** `best [product category] for [primary use case] under [budget] {current_year}`
-        *   **Example:** `best laptops for college students under $1000 2024`
-
-    *   **Type 2: The Top-Priority Deep-Dive Query**
-        *   **Purpose:** To find specialized content that rigorously tests the user's single most important feature. This is crucial for providing specific evidence in the final recommendation.
-        *   **Formula:** `[product category] with best [critical feature]` OR `best [product category] for [specific task]`
-        *   **Example (if user's top priority is battery):** `laptops with longest battery life 2024`
-        *   **Example (if user's top priority is typing):** `laptops with the best keyboards for writers 2024`
-
-    *   **Type 3: The Pain-Point Solver Query**
-        *   **Purpose:** To find products that directly address a user's stated frustration.
-        *   **Formula:** `[adjective like 'fastest' or 'quietest'] [product category]` OR `[product category] that [solves a problem]`
-        *   **Example (if user is frustrated with coffee maker cleanup):** `easiest to clean single serve coffee makers 2024`
-
-    *   **Type 4: The "Best Value" / Budget-Alternative Query**
-        *   **Purpose:** To find the best "bang-for-the-buck" options, especially if the user's budget is tight for their desired features. This helps find "Strategic Alternatives".
-        *   **Formula:** `best budget [product category] {current_year}` OR `best value [product category] for [use case] {current_year}`
-        *   **Example:** `best budget 4K TVs under $500 2024`
-
-    *   **Type 5: The Comparative Query**
-        *   **Purpose:** To find articles that directly compare two competing technologies or product types that represent a key trade-off for the user.
-        *   **Formula:** `[Technology A] vs [Technology B] [product category]`
-        *   **Example (if user is deciding on TV tech):** `OLED vs QLED for gaming 2024`
-
-### Example Execution
-
-**If User's Answers indicate:** A student needing a laptop under $1500, prioritizing a great screen for photo editing but also good battery life for class.
-**Your generated queries might be:**
-1.  `best laptops for college students under $1500 2024` (Baseline)
-2.  `laptops with the most color accurate screens for photo editing 2024` (Top-Priority Deep-Dive)
-3.  `laptops with best battery life 2024` (Second-Priority Deep-Dive)
-4.  `best value laptops for photo editing 2024` (Best Value)
+### Step 3: Strategic Deep-Dive Query Formulation
+Based on your feasibility assessment and identified gaps, create a portfolio of exactly **2-3 new, surgical search queries**. These queries are your tools to fill the knowledge gaps.
+- If the request was **feasible**, the queries should be laser-focused on the identified gaps. (e.g., `laptops with best real-world battery life 2024`, `easiest to clean single-serve coffee makers review`)
+- If the request was **challenging**, at least one query should be designed to find good "plan B" options. This means searching for alternatives that relax one of the user's constraints. (e.g., `best value laptops for 4K video editing 2024`, `what's the best graphics card for laptops under $1200`)
 
 ---
-### Your Task
 
-Analyze the user's answers below and generate a portfolio of 3-5 strategic search queries. The queries must be natural, distinct, and designed to gather a comprehensive set of information. Always include the current year ({current_year}).
+### **INPUT FOR YOUR ANALYSIS**
 
-**User's Initial Request:**
+**1. User's Initial Request:**
 "{user_query}"
 
-**User's Answers:**
+**2. User's Detailed Needs (from Questionnaire):**
 {user_answers_json}
 
-Generate the 3-5 best search queries in the specified JSON format.
+**3. Reconnaissance Search Results (from the initial query):**
+{recon_search_results_json}
+
+---
+
+### **YOUR TASK**
+
+Execute your three-step analysis based on the inputs above. Generate your research plan in the specified JSON format. The queries must include the current year ({current_year}).
 """
 
-# Step 5: Final Website Selection
-STEP5_WEBSITE_SELECTION_PROMPT = """You are a meticulous Research Analyst and Information Quality Specialist. Your critical mission is to act as the final gatekeeper, selecting a small, high-impact portfolio of web pages for in-depth analysis. The quality of your selection directly determines the validity of the final recommendation. Garbage in, garbage out.
+# Step R4: Evidence Curation (Final URL Selection)
+STEP_R4_EVIDENCE_CURATOR_PROMPT = """You are a meticulous Research Analyst and Information Quality Specialist. Your critical mission is to act as the final gatekeeper, selecting a small, high-impact portfolio of web pages for in-depth analysis. The quality of your selection directly determines the validity of the final recommendation. Garbage in, garbage out.
 
-Your task is to analyze the provided search results and select a portfolio of the **4 to 5 most valuable and diverse websites** that best address the user's needs, as detailed below.
+Your task is to analyze the provided search results and the research strategy to select a balanced portfolio of the **3 to 5 most valuable and diverse websites**.
 
-### User Context
-**Initial Request:** "{user_query}"
-**Detailed Needs (from questionnaire):**
+---
+
+### **INPUT FOR YOUR ANALYSIS**
+
+**1. User's Initial Request:**
+"{user_query}"
+
+**2. User's Detailed Needs (from Questionnaire):**
 {user_answers_json}
 
+**3. The Research Strategy:**
+This is the plan formulated by our strategist. It tells you what to look for.
+{research_strategy_json}
+
+**4. Available Evidence (All Search Results):**
+This is the complete set of raw materials you can choose from. It is organized by the query that produced it.
+
+*   **Reconnaissance Search Results:**
+    {recon_search_results_json}
+
+*   **Deep-Dive Search Results:**
+    {deep_dive_search_results_json}
+
 ---
 
-This is a multi-step process. Follow these phases precisely:
+### **YOUR SELECTION PROCESS**
 
- ### Phase 1: Initial Triage (Filter Out Low-Quality Sources)
- First, immediately disqualify and ignore any search result that is:
- - **An E-commerce or Manufacturer Page:** A direct link to a store (like Amazon, Best Buy) or a product's homepage (like Dell.com, Apple.com). These are not impartial reviews.
- - **A Forum or Discussion Board:** A link to a user-generated content platform like Reddit, Quora, or a forum section of a site. Prioritize editorial content.
- - **A "Deals" Page:** A result where the title or snippet is primarily focused on "deals," "discounts," or "coupons" rather than product evaluation.
- - **Stale Content:** An article more than 2 years old, unless it's a foundational comparison of a technology that hasn't changed.
+Follow these phases precisely to build your final portfolio of 3-5 URLs.
 
-### Phase 2: The Prioritization Rubric (Score the Remaining Candidates)
-For the remaining candidates, evaluate them using the following hierarchy. A source that meets multiple high-priority criteria is a prime candidate.
+**Phase 1: Initial Triage (Filter Out Low-Quality Sources)**
+First, immediately disqualify and ignore any search result that is:
+ - **A direct E-commerce or Manufacturer Page** (e.g., Amazon, Best Buy, Dell.com).
+ - **A Forum or Discussion Board** (e.g., Reddit, Quora).
+ - **A "Deals" or "Coupons" page.**
+ - **Stale Content** (more than 2 years old, unless it's a foundational technology comparison).
+
+**Phase 2: Strategic Prioritization (Score the Remaining Candidates)**
+For the remaining candidates, evaluate them using the `Research Strategy` as your guide. A source that directly addresses an `identifiedGap` is of the highest possible value.
 
 **High Priority Signals (Highest Weight):**
-- **Domain Authority & Trust:** Does the domain belong to an established publication known for impartial, in-depth reviews and expert testing? **Give maximum weight to sites whose primary purpose is to review products, rather than sites that primarily sell products or represent a single brand.**
-- **Evidence of Testing:** Does the `title` or `snippet` contain keywords that signal in-depth, original work? Look for: `review`, `tested`, `hands-on`, `benchmarks`, `lab tests`, `vs`, `comparison`, `in-depth`.
-- **Hyper-Relevance to User Need:** Does the `title` or `snippet` directly address a critical priority detailed in the `User Context` above? (e.g., if the user wants a laptop for "photo editing," a link titled "Best Laptops for Photo Editing" is more valuable than a generic "Best Laptops" article).
+- **Addresses a Stated Gap:** The `title` or `snippet` directly aligns with one of the `identifiedGaps` or the `feasibilityAssessment` from the `Research Strategy`. This is your primary objective.
+- **Evidence of Testing:** The `title` or `snippet` contains keywords like `review`, `tested`, `hands-on`, `benchmarks`, `vs`, `comparison`.
+- **Domain Authority:** The domain is a trusted, impartial publication known for reviews (e.g., Wirecutter, Rtings, CNET, The Verge).
 
-**Medium Priority Signals (Good Supporting Indicators):**
-- **Recency:** The article is from the `{current_year}` or `{previous_year}`. This is crucial for most product categories.
-- **Broad "Best Of" Roundups:** A title like "The Best [Product Category] of {current_year}" from a reputable source. These are good for establishing a list of top market contenders.
+**Medium Priority Signals:**
+- **Recency:** The article is from the `{current_year}` or `{previous_year}`.
+- **Broad "Best Of" Roundups:** A title like "The Best [Product Category] of {current_year}" from a reputable source is good for context.
 
 **Negative Signals (Reasons to Downgrade or Avoid):**
-- **Domain Duplication:** Avoid selecting multiple links from the same domain unless they cover fundamentally different and critical topics (e.g., one is a "Best Of" list and the other is a deep-dive review of the top product from that list).
-- **Vague or "Thin" Content:** The snippet is just a list of product names without any analysis or justification.
+- **Domain Duplication:** Avoid selecting multiple links from the same domain unless they cover fundamentally different and critical topics (e.g., one is a "Best Of" list and the other is a deep-dive review of a specific product).
 
-### Phase 3: Assemble the Final Portfolio
-From your highest-rated candidates, construct your final selection. **Do not simply pick the top 5 scores.** Your goal is to create a balanced research packet. Your final selection of **4 to 5 URLs** should aim for this mix:
-- **At least ONE Broad Market Roundup** (e.g., "Best [Product Category] of 2024") to understand the overall landscape.
-- **At least ONE Priority-Focused Deep Dive or Comparison** (e.g., "Quietest Coffee Grinders" or "Burr vs Blade Grinders") to gather specific evidence on what matters most to the user.
-- **Fill the remaining 2-3 slots** with other high-quality sources, prioritizing specific product reviews or other relevant deep dives.
+**Phase 3: Assemble the Final Portfolio**
+From your highest-rated candidates, construct your final selection. **Do not simply pick the top scores.** Your goal is to create a balanced research packet. Your final selection of **3 to 5 URLs** should aim for this mix:
+- **At least ONE Broad Market Roundup** (from the Reconnaissance results) to understand the overall landscape.
+- **At least ONE or TWO Priority-Focused Deep Dives** (likely from the Deep-Dive results) that directly address the `identifiedGaps`.
+- **Fill the remaining slots** with other high-quality, relevant sources.
 
 ---
-### Your Task
+### **YOUR TASK**
 
-**Search Results from Multiple Queries:**
-{rec_search_results_json}
+Based on the rigorous process described above, select the 3 to 5 most valuable and diverse websites from the `Available Evidence`.
 
-Select the 4 to 5 most valuable and diverse websites based on the rigorous process described above. Your selection must be in the specified JSON format.
+Output your selection in the specified JSON format.
 """
 
 # Step 6: Final Recommendations (with thinking mode)
@@ -253,16 +248,22 @@ STEP6_FINAL_RECOMMENDATIONS_PROMPT = """### **Prompt: The AI Recommendation Cons
 ### **INPUTS FOR YOUR ANALYSIS**
 
 *   **User Profile:**
-    *   **Initial Request:** `{user_query}`
-    *   **Detailed Needs:** `{user_answers_json}`
-*   **Search Gist:** `{rec_search_results_json}` <!-- Use for high-level context only -->
-*   **Expert Review Data:** `{rec_scraped_contents_json}` <!-- This is your source of truth. Every claim MUST be traceable to this data. -->
+    *   **Initial Request:** {user_query}
+    *   **Detailed Needs:** {user_answers_json}
+
+*   **Search Result Snippets (for rough context):**
+    *   **Reconnaissance Search (direct user query):** {recon_search_results_json}
+    *   **Deep-Dive Search (refined based on Reconnaissance Search):** {deep_dive_search_results_json}
+
+*   **Expert Review Data (Your Ground Truth):**
+    *   This is the scraped text from the most relevant articles. Every claim you make MUST be traceable to this data.
+    *   {rec_scraped_contents_json}
 
 ---
 
 ### **CRITICAL DECISION POINT**
 
-First, analyze the `Expert Review Data` against the user's most critical, non-negotiable needs in the `User Profile`.
+First, analyze the Search Result Snippets and the Expert Review Data against the user's core needs.
 
 *   **IF** you find at least one product that is a strong match for the user's core requirements...
     *   **THEN** you MUST generate your entire output using the **"Guide 1: We Found Great Options"** structure.

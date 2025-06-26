@@ -15,8 +15,10 @@ from app.prompts import (
     STEP0_GUARDRAIL_PROMPT,
     STEP3A_BUDGET_PROMPT,
     STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT,
-    STEP4_SEARCH_QUERY_PROMPT,
-    STEP5_WEBSITE_SELECTION_PROMPT,
+    # --- MODIFICATION START ---
+    STEP_R2_RESEARCH_STRATEGIST_PROMPT,
+    STEP_R4_EVIDENCE_CURATOR_PROMPT,
+    # --- MODIFICATION END ---
     STEP6_FINAL_RECOMMENDATIONS_PROMPT,
     IMAGE_CURATION_PROMPT,
     SHOPPING_CURATION_PROMPT
@@ -25,7 +27,9 @@ from app.schemas import (
     GUARDRAIL_RESPONSE_SCHEMA,
     BUDGET_QUESTION_SCHEMA,
     DIAGNOSTIC_QUESTIONS_SCHEMA,
-    REC_SEARCH_TERMS_SCHEMA,
+    # --- MODIFICATION START ---
+    RESEARCH_STRATEGY_SCHEMA,
+    # --- MODIFICATION END ---
     REC_SEARCH_URLS_SCHEMA,
     IMAGE_CURATION_SCHEMA,
     SHOPPING_CURATION_SCHEMA
@@ -102,46 +106,65 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
     result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA, use_thinking=True)
     return result.get("questions", [])
 
-def generate_search_queries(user_query: str, user_answers: list[dict]) -> list[str]:
+# --- MODIFICATION START: NEW AND REWRITTEN FUNCTIONS ---
+
+def generate_research_strategy(user_query: str, user_answers: list[dict], recon_search_results: list[dict]) -> dict:
     """
-    Step 4: Generate search queries based on user's initial query and MCQ answers.
+    Step R2: Analyzes initial search results against user needs to devise a research plan.
     """
     current_year = datetime.datetime.now().year
-    prompt = STEP4_SEARCH_QUERY_PROMPT.format(
+    prompt = STEP_R2_RESEARCH_STRATEGIST_PROMPT.format(
         user_query=user_query,
         user_answers_json=json.dumps(user_answers, indent=2),
+        recon_search_results_json=json.dumps(recon_search_results, indent=2),
         current_year=current_year
     )
-    result = _make_stateless_call_json(MID_MODEL_NAME, prompt, REC_SEARCH_TERMS_SCHEMA)
-    return result.get("rec_search_terms", [])
+    return _make_stateless_call_json(LOW_MODEL_NAME, prompt, RESEARCH_STRATEGY_SCHEMA, use_thinking=True)
 
-def select_recommendation_urls(user_query: str, user_answers: list[dict], rec_search_results: list) -> list[dict]:
+
+def select_final_evidence_urls(
+    user_query: str,
+    user_answers: list[dict],
+    research_strategy: dict,
+    recon_search_results: list[dict],
+    deep_dive_search_results: list[dict]
+) -> list[dict]:
     """
-    Step 5: Select 3-5 best URLs from recommendation search results based on user context.
+    Step R4: Selects the best 3-5 URLs from all available search evidence, guided by the research strategy.
     """
     current_year = datetime.datetime.now().year
     previous_year = current_year - 1
-    prompt = STEP5_WEBSITE_SELECTION_PROMPT.format(
+    prompt = STEP_R4_EVIDENCE_CURATOR_PROMPT.format(
         user_query=user_query,
         user_answers_json=json.dumps(user_answers, indent=2),
-        rec_search_results_json=json.dumps(rec_search_results, indent=2),
+        research_strategy_json=json.dumps(research_strategy, indent=2),
+        recon_search_results_json=json.dumps(recon_search_results, indent=2),
+        deep_dive_search_results_json=json.dumps(deep_dive_search_results, indent=2),
         current_year=current_year,
         previous_year=previous_year
     )
-    result = _make_stateless_call_json(MID_MODEL_NAME, prompt, REC_SEARCH_URLS_SCHEMA)
+    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, REC_SEARCH_URLS_SCHEMA, use_thinking=True)
     return result.get("rec_search_urls", [])
 
-def generate_final_recommendations(user_query: str, user_answers: list[dict], rec_search_results: list, rec_scraped_contents: list) -> str:
+
+def generate_final_recommendations(
+    user_query: str,
+    user_answers: list[dict],
+    recon_search_results: list[dict],
+    deep_dive_search_results: list[dict],
+    rec_scraped_contents: list[dict]
+) -> str:
     """
-    Step 6: Generate final product recommendations (with thinking mode).
-    This call expects a raw text response and handles it directly.
+    Step R6: Generate final product recommendations (with thinking mode).
+    The prompt is now informed by the research strategy.
     """
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
         prompt = STEP6_FINAL_RECOMMENDATIONS_PROMPT.format(
             user_query=user_query,
             user_answers_json=json.dumps(user_answers, indent=2),
-            rec_search_results_json=json.dumps(rec_search_results, indent=2),
+            recon_search_results_json=json.dumps(recon_search_results, indent=2),
+            deep_dive_search_results_json=json.dumps(deep_dive_search_results, indent=2),
             rec_scraped_contents_json=json.dumps(rec_scraped_contents, indent=2)
         )
         
@@ -172,6 +195,8 @@ def generate_final_recommendations(user_query: str, user_answers: list[dict], re
     except Exception as e:
         print(f"ERROR: Final recommendation generation failed: {e}")
         raise
+
+# --- MODIFICATION END ---
 
 # ==============================================================================
 # Enrichment Flow Functions (Stateless)
