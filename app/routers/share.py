@@ -38,17 +38,16 @@ router = APIRouter(
     summary="Create a permanent share link"
 )
 async def create_share_link_endpoint(
-    http_request: Request, # Used to construct the full URL
     request: ShareCreateRequest,
     user_id: str = Depends(get_current_user)
 ):
     """
-    Creates a unique, permanent, and publicly accessible URL for a given
+    Creates a unique, permanent, and publicly accessible ID for a given
     recommendation conversation.
 
     - This endpoint is authenticated and requires ownership of the conversation.
     - If a share link for this conversation already exists, it will return
-      the existing URL instead of creating a new one.
+      the existing ID instead of creating a new one.
     """
     print(f"User '{user_id}' requesting to share conversation '{request.conversation_id}'.")
     try:
@@ -57,21 +56,8 @@ async def create_share_link_endpoint(
             user_id=user_id
         )
 
-        # Construct the full, absolute URL to return to the client
-        # This is better than returning a relative path.
-        base_url = str(http_request.base_url)
-        # Assuming the frontend URL structure is like `https://domain.com/share/...`
-        # We replace the API's base URL with the intended frontend root.
-        # A more robust solution might get the frontend URL from config.
-        # For now, this is a reasonable approach.
-        frontend_base_url = base_url.replace(http_request.scope.get('root_path', ''), '').rstrip('/')
-        
-        # In a real-world scenario, you might have a config variable for the frontend URL
-        # For example: `share_url = f"https://www.recmonkey.com/share/{share_id}"`
-        share_url = f"{frontend_base_url}/share/{share_id}"
-
-
-        return {"shareUrl": share_url}
+        # The Pydantic model now expects `share_id`, which will be aliased to `shareId` in the JSON.
+        return {"share_id": share_id}
 
     except share_service.ConversationNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

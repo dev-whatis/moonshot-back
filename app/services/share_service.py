@@ -139,12 +139,14 @@ def get_shared_data(share_id: str) -> Dict[str, Any]:
         print(f"WARNING: Failed to increment view count for share_id '{share_id}': {e}")
     
     # 5. Assemble and return the payload for the frontend
-    # Use .get() with defaults to handle cases where a field might be missing
-    # (e.g., enrichment was never run for this conversation).
+    # Use .get() with defaults to handle cases where a field might be missing.
+    # --- MODIFICATION START ---
     response_payload = {
+        "user_query": history_data.get("userQuery", "Original query not found."), # Add the userQuery
         "recommendations": history_data.get("recommendations", "No recommendation report found."),
         "productNames": history_data.get("productNames", []),
         "enrichedProducts": history_data.get("enrichedProducts", [])
     }
+    # --- MODIFICATION END ---
 
     return response_payload

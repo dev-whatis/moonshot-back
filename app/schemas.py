@@ -236,7 +236,7 @@ class EnrichResponse(BaseModel):
 
 class ShareCreateResponse(BaseModel):
     """Data model for the POST /api/share endpoint response body."""
-    share_url: str = Field(..., alias="shareUrl", description="The unique, public URL for the shared recommendation.")
+    share_id: str = Field(..., alias="shareId", description="The unique, public ID for the shared recommendation.")
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -248,6 +248,7 @@ class ShareDataResponse(BaseModel):
     Data model for the public GET /api/share/{shareId} endpoint.
     Contains all the data needed to render a shared recommendation page.
     """
+    user_query: str = Field(..., alias="userQuery", description="The original user query that initiated the recommendation.")
     recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
     product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the Report.")
     enriched_products: List[EnrichedProduct] = Field(..., alias="enrichedProducts", description="The enriched data for the recommended products.")
