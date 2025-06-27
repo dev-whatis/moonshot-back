@@ -102,6 +102,14 @@ class EnrichRequest(BaseModel):
         populate_by_name=True,
     )
 
+class ShareCreateRequest(BaseModel):
+    """Data model for the POST /api/share endpoint request body."""
+    conversation_id: str = Field(..., alias="conversationId", description="The ID of the conversation to be shared.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 # --- Response Models ---
 
@@ -226,6 +234,28 @@ class EnrichResponse(BaseModel):
         populate_by_name=True,
     )
 
+class ShareCreateResponse(BaseModel):
+    """Data model for the POST /api/share endpoint response body."""
+    share_url: str = Field(..., alias="shareUrl", description="The unique, public URL for the shared recommendation.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class ShareDataResponse(BaseModel):
+    """
+    Data model for the public GET /api/share/{shareId} endpoint.
+    Contains all the data needed to render a shared recommendation page.
+    """
+    recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
+    product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the Report.")
+    enriched_products: List[EnrichedProduct] = Field(..., alias="enrichedProducts", description="The enriched data for the recommended products.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 # ==============================================================================
 # Internal OpenAPI Schemas for Gemini Interactions

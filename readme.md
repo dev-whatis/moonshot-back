@@ -4,13 +4,15 @@ app/main.py
 app/prompts.py
 app/schemas.py
 app/middleware/auth.py
-app/routers/recommendations.py
 app/routers/enrich.py
+app/routers/recommendations.py
+app/services/enrichment_service.py
 app/services/llm_calls.py
-app/services/search_functions.py
 app/services/logging_service.py
 app/services/parsing_service.py
-app/services/enrichment_service.py
+app/services/recommendation_service.py
+app/services/search_functions.py
+
 
 requirements.txt
 firebase-service-account.json
