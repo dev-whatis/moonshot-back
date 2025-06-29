@@ -5,7 +5,7 @@
 """
 import httpx
 import json
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any
 
 # Import Tavily client and API key
@@ -20,19 +20,24 @@ from app.config import SERPER_API_KEY, MAX_CONCURRENT_REQUESTS
 # Recommendation Flow Functions (Using Tavily)
 # ==============================================================================
 
-def _search_single_tavily_query(term: str) -> Dict[str, Any]:
+def _search_single_tavily_query(
+    term: str, 
+    search_depth: str = "advanced", 
+    max_results: int = 10, 
+    country: str = "united states"
+) -> Dict[str, Any]:
     """
-    Helper function to perform a single search query using the Tavily client.
-    This function is designed to be called in parallel.
+    Helper function to perform a single search query using the Tavily client
+    with configurable parameters.
     """
-    print(f"Tavily: Searching for '{term}'")
+    print(f"Tavily: Searching for '{term}' with depth='{search_depth}', max_results={max_results}, country='{country}'")
     try:
         client = TavilyClient(api_key=TAVILY_API_KEY)
         response = client.search(
             query=term,
-            search_depth="advanced",
-            max_results=10,
-            country="united states"
+            search_depth=search_depth,
+            max_results=max_results,
+            country=country
         )
         # The Tavily response format is already what we want to pass on.
         return response
@@ -42,12 +47,21 @@ def _search_single_tavily_query(term: str) -> Dict[str, Any]:
         return {"query": term, "results": []}
 
 
-def search_product_recommendations(rec_search_terms: List[str]) -> List[Dict[str, Any]]:
+def search_product_recommendations(
+    rec_search_terms: List[str],
+    search_depth: str = "advanced",
+    max_results_per_term: int = 10,
+    country: str = "united states"
+) -> List[Dict[str, Any]]:
     """
-    Step 4.5: Search for product recommendations using parallel Tavily API calls.
+    Step 4.5: Search for product recommendations using parallel Tavily API calls
+    with configurable parameters.
     
     Args:
         rec_search_terms (List[str]): List of search terms for finding product recommendations.
+        search_depth (str): The depth of the search ('basic' or 'advanced').
+        max_results_per_term (int): The number of results to return for each search term.
+        country (str): The country to search from.
     
     Returns:
         List[Dict[str, Any]]: A list of Tavily search result objects, one for each term.
@@ -59,10 +73,19 @@ def search_product_recommendations(rec_search_terms: List[str]) -> List[Dict[str
 
     results = []
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
-        # Map each search term to the search function
-        future_to_term = {executor.submit(_search_single_tavily_query, term): term for term in rec_search_terms}
+        # Map each search term to the search function, passing the new parameters
+        future_to_term = {
+            executor.submit(
+                _search_single_tavily_query, 
+                term, 
+                search_depth, 
+                max_results_per_term, 
+                country
+            ): term 
+            for term in rec_search_terms
+        }
         
-        for future in future_to_term:
+        for future in as_completed(future_to_term):
             try:
                 result = future.result()
                 results.append(result)

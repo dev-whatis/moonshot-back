@@ -76,7 +76,7 @@ def create_share_link(conversation_id: str, user_id: str) -> str:
     
     share_data = {
         "conversationId": conversation_id,
-        "ownerId": user_id,
+        "userId": user_id,
         "createdAt": firestore.SERVER_TIMESTAMP,
         "isEnabled": True,
         "viewCount": 0

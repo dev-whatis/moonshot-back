@@ -111,6 +111,42 @@ class ShareCreateRequest(BaseModel):
         populate_by_name=True,
     )
 
+class DeepResearchRequest(BaseModel):
+    """Data model for the POST /api/research endpoint request body."""
+    # This model remains the same
+    conversation_id: str = Field(..., alias="conversationId", description="The ID of the conversation to provide user context.")
+    product_name: str = Field(..., alias="productName", description="The specific product name to be researched.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class DeepResearchResponse(BaseModel):
+    """
+    Data model for the immediate, asynchronous response from the POST /api/research endpoint.
+    It acknowledges the request and provides the UNIQUE ID to poll for status.
+    """
+    # --- THIS MODEL IS CHANGED ---
+    # It now correctly returns `researchId` instead of `conversationId`.
+    research_id: str = Field(..., alias="researchId")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class DeepResearchResultResponse(BaseModel):
+    """Data model for the GET /api/research/result/{research_id} endpoint response."""
+    # This model remains the same
+    report: str = Field(..., description="The full, comprehensive deep research report in Markdown format.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+
 # --- Response Models ---
 
 # NEW MODEL for the asynchronous /finalize endpoint response
@@ -416,7 +452,6 @@ REC_SEARCH_URLS_SCHEMA = {
 }
 
 
-# --- MODIFICATION START: Schemas for the new Dual-LLM Enrichment feature ---
 IMAGE_CURATION_SCHEMA = {
     "type": "object",
     "properties": {
@@ -477,4 +512,29 @@ SHOPPING_CURATION_SCHEMA = {
     },
     "required": ["curatedShoppingLinks"]
 }
-# --- MODIFICATION END ---
+
+# Step DR1: Deep Research Website Selection
+DEEP_RESEARCH_URL_SELECTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "selected_urls": {
+            "type": "array",
+            "description": "A list of the 3-5 most valuable and diverse websites for in-depth analysis.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "The title of the selected web page."
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "The URL of the selected web page."
+                    }
+                },
+                "required": ["title", "url"]
+            }
+        }
+    },
+    "required": ["selected_urls"]
+}

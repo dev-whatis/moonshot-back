@@ -17,17 +17,7 @@ CONVERSATION_ID_ENABLED = True
 # In production, this should be True.
 AUTH_ENABLED = True
 
-# Path to your Firebase service account key JSON file.
-
-# For production environments (using Google Cloud Secret Manager)
-
 FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
-
-# For local testing
-# The `firebase-service-account.json` file should be in the root directory.
-# Uncomment the line below to use a local service account key file.
-
-# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
 
 # --- Tavily API Configuration ---
 # This is a secret and should be set in your .env file

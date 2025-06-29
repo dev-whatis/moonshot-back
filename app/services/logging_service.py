@@ -31,23 +31,33 @@ except Exception as e:
 # Service Functions
 # ==============================================================================
 
-def log_step(conversation_id: Optional[str], step_name: str, step_data: Dict[str, Any]):
+# In app/services/logging_service.py
+# REPLACE the entire log_step function with this new version.
+
+def log_step(
+    primary_id: Optional[str], 
+    step_name: str, 
+    step_data: Dict[str, Any],
+    parent_conversation_id: Optional[str] = None
+):
     """
     Logs the data for a single step of a conversation to GCS for debugging.
-    This function will do nothing if CONVERSATION_ID_ENABLED is False or if
-    no conversation_id is provided.
+    This function can now handle nested logging for features like deep research.
 
     Args:
-        conversation_id: The unique ID for the entire conversation.
-        step_name: The name of the file to be created (e.g., "01_start", "02_finalize").
+        primary_id: The unique ID for the specific job or conversation.
+        step_name: The name of the file to be created (e.g., "01_start").
         step_data: A dictionary containing the JSON-serializable data for this step.
+        parent_conversation_id: If provided, this is used as the top-level folder
+                                in GCS, and the primary_id is used in the filename.
     """
-    if not CONVERSATION_ID_ENABLED or not conversation_id:
+    # The primary_id is now used for the check, which covers both conv_id and research_id
+    if not CONVERSATION_ID_ENABLED or not primary_id:
         print(f"INFO: GCS logging for step '{step_name}' skipped (disabled by config or no ID).")
         return
 
     if not gcs_bucket:
-        print(f"Skipping log for conv_id {conversation_id} because GCS client is not initialized.")
+        print(f"Skipping log for id {primary_id} because GCS client is not initialized.")
         return
 
     try:
@@ -55,21 +65,36 @@ def log_step(conversation_id: Optional[str], step_name: str, step_data: Dict[str
         
         # Add metadata to the log payload
         step_data["_log_timestamp_utc"] = now_utc.isoformat()
-        step_data["_conversation_id"] = conversation_id
         step_data["_step_name"] = step_name
         
         # Construct the partitioned GCS object path
         year, month, day = now_utc.strftime("%Y"), now_utc.strftime("%m"), now_utc.strftime("%d")
-        gcs_path = f"traces/{year}/{month}/{day}/{conversation_id}/{step_name}.json"
+
+        if parent_conversation_id:
+            # This is a nested job (like deep research).
+            # Use the parent ID for the folder and the primary ID in the filename.
+            folder_id = parent_conversation_id
+            file_name = f"{primary_id}-{step_name}.json"
+            step_data["_research_id"] = primary_id
+            step_data["_conversation_id"] = parent_conversation_id
+
+        else:
+            # This is a standard, top-level job.
+            # The primary ID is the conversation ID itself.
+            folder_id = primary_id
+            file_name = f"{step_name}.json"
+            step_data["_conversation_id"] = primary_id
+
+        gcs_path = f"traces/{year}/{month}/{day}/{folder_id}/{file_name}"
         
         blob = gcs_bucket.blob(gcs_path)
         log_json = json.dumps(step_data, indent=2, ensure_ascii=False)
         blob.upload_from_string(log_json, content_type="application/json")
         
-        print(f"Successfully saved GCS log for conv_id {conversation_id}, step {step_name}.")
+        print(f"Successfully saved GCS log to: {gcs_path}")
 
     except Exception as e:
-        print(f"ERROR: Failed to save GCS log for conv_id {conversation_id}, step {step_name}: {e}")
+        print(f"ERROR: Failed to save GCS log for id {primary_id}, step {step_name}: {e}")
 
 # --- MODIFICATION START ---
 def create_history_document(conversation_id: Optional[str], initial_data: Dict[str, Any]):
@@ -96,7 +121,6 @@ def create_history_document(conversation_id: Optional[str], initial_data: Dict[s
     except Exception as e:
         print(f"ERROR: Failed to CREATE history doc in Firestore for conv_id {conversation_id}: {e}")
 
-# --- NEW FUNCTION ---
 def set_job_complete(conversation_id: Optional[str], result_payload: Dict[str, Any]):
     """
     Updates a history document when a background job completes successfully.
@@ -119,7 +143,6 @@ def set_job_complete(conversation_id: Optional[str], result_payload: Dict[str, A
     except Exception as e:
         print(f"ERROR: Failed to update job to 'complete' in Firestore for conv_id {conversation_id}: {e}")
 
-# --- NEW FUNCTION ---
 def set_job_failed(conversation_id: Optional[str], error_message: str):
     """
     Updates a history document when a background job fails.
@@ -165,7 +188,6 @@ def update_history_with_enrichment(conversation_id: Optional[str], enriched_prod
         print(f"Successfully UPDATED enrichment data for conv_id {conversation_id} in Firestore.")
     except Exception as e:
         print(f"ERROR: Failed to UPDATE history doc in Firestore for conv_id {conversation_id}: {e}")
-# --- MODIFICATION END ---
 
 
 def save_rejected_query(rejection_data: dict):
@@ -204,3 +226,72 @@ def save_rejected_query(rejection_data: dict):
     except Exception as e:
         rejection_id_for_error = rejection_data.get("rejectionId")
         print(f"ERROR: Failed to save rejected query log to GCS for id '{rejection_id_for_error}': {e}")
+
+
+def create_research_job_document(research_id: Optional[str], initial_data: Dict[str, Any]):
+    """
+    Creates the initial document in the 'research' collection to track a new job.
+    Uses the unique research_id as the document ID.
+    """
+    if not CONVERSATION_ID_ENABLED or not research_id:
+        print("INFO: Firestore research job creation skipped (disabled by config or no ID).")
+        return
+
+    if not firestore_client:
+        print(f"Skipping research job create for research_id {research_id}, client not initialized.")
+        return
+        
+    try:
+        # Use the unique research_id as the document ID in the 'research' collection
+        doc_ref = firestore_client.collection("research").document(research_id)
+        
+        # The initial_data payload should contain userId and conversationId from the router
+        initial_data["createdAt"] = firestore.SERVER_TIMESTAMP
+        initial_data["status"] = "processing" # Set initial status
+        doc_ref.set(initial_data)
+        
+        print(f"Successfully CREATED initial research job for research_id {research_id} in Firestore.")
+    except Exception as e:
+        print(f"ERROR: Failed to CREATE research job doc in Firestore for research_id {research_id}: {e}")
+
+def set_research_job_complete(research_id: Optional[str], result_payload: Dict[str, Any]):
+    """
+    Updates a research job document when the background job completes successfully.
+    """
+    if not CONVERSATION_ID_ENABLED or not research_id:
+        return
+    if not firestore_client:
+        return
+
+    try:
+        doc_ref = firestore_client.collection("research").document(research_id)
+        final_payload = {
+            "status": "complete",
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+            **result_payload # This will contain the final 'report'
+        }
+        doc_ref.update(final_payload)
+        print(f"Successfully updated research job to 'complete' for research_id {research_id}.")
+    except Exception as e:
+        print(f"ERROR: Failed to update research job to 'complete' in Firestore for research_id {research_id}: {e}")
+
+def set_research_job_failed(research_id: Optional[str], error_message: str):
+    """
+    Updates a research job document when the background job fails.
+    """
+    if not CONVERSATION_ID_ENABLED or not research_id:
+        return
+    if not firestore_client:
+        return
+
+    try:
+        doc_ref = firestore_client.collection("research").document(research_id)
+        failure_payload = {
+            "status": "failed",
+            "error": error_message,
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        }
+        doc_ref.update(failure_payload)
+        print(f"Successfully updated research job to 'failed' for research_id {research_id}.")
+    except Exception as e:
+        print(f"ERROR: Failed to update research job to 'failed' in Firestore for research_id {research_id}: {e}")

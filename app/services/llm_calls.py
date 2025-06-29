@@ -15,24 +15,23 @@ from app.prompts import (
     STEP0_GUARDRAIL_PROMPT,
     STEP3A_BUDGET_PROMPT,
     STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT,
-    # --- MODIFICATION START ---
     STEP_R2_RESEARCH_STRATEGIST_PROMPT,
     STEP_R4_EVIDENCE_CURATOR_PROMPT,
-    # --- MODIFICATION END ---
     STEP6_FINAL_RECOMMENDATIONS_PROMPT,
     IMAGE_CURATION_PROMPT,
-    SHOPPING_CURATION_PROMPT
+    SHOPPING_CURATION_PROMPT,
+    STEP_DR1_URL_SELECTOR_PROMPT,
+    STEP_DR2_SYNTHESIS_PROMPT,
 )
 from app.schemas import (
     GUARDRAIL_RESPONSE_SCHEMA,
     BUDGET_QUESTION_SCHEMA,
     DIAGNOSTIC_QUESTIONS_SCHEMA,
-    # --- MODIFICATION START ---
     RESEARCH_STRATEGY_SCHEMA,
-    # --- MODIFICATION END ---
     REC_SEARCH_URLS_SCHEMA,
     IMAGE_CURATION_SCHEMA,
-    SHOPPING_CURATION_SCHEMA
+    SHOPPING_CURATION_SCHEMA,
+    DEEP_RESEARCH_URL_SELECTION_SCHEMA
 )
 
 # ==============================================================================
@@ -105,8 +104,6 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
     prompt = STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT.format(user_query=user_query)
     result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA, use_thinking=True)
     return result.get("questions", [])
-
-# --- MODIFICATION START: NEW AND REWRITTEN FUNCTIONS ---
 
 def generate_research_strategy(user_query: str, user_answers: list[dict], recon_search_results: list[dict]) -> dict:
     """
@@ -196,7 +193,54 @@ def generate_final_recommendations(
         print(f"ERROR: Final recommendation generation failed: {e}")
         raise
 
-# --- MODIFICATION END ---
+def select_deep_research_urls(product_name: str, search_results: List[Dict]) -> List[Dict]:
+    """
+    Step DR1: Selects the best 3-5 expert review URLs for deep analysis.
+    """
+    prompt = STEP_DR1_URL_SELECTOR_PROMPT.format(
+        product_name=product_name,
+        search_results_json=json.dumps(search_results, indent=2)
+    )
+    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DEEP_RESEARCH_URL_SELECTION_SCHEMA, use_thinking=True)
+    return result.get("selected_urls", [])
+
+
+def generate_deep_research_report(
+    user_query: str,
+    user_answers: List[Dict],
+    product_name: str,
+    scraped_contents: List[Dict]
+) -> str:
+    """
+    Step DR2: Generates the final, comprehensive deep research report.
+    """
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        prompt = STEP_DR2_SYNTHESIS_PROMPT.format(
+            user_query=user_query,
+            user_answers_json=json.dumps(user_answers, indent=2),
+            product_name=product_name,
+            scraped_contents_json=json.dumps(scraped_contents, indent=2)
+        )
+        
+        config = types.GenerateContentConfig(
+            temperature=DEFAULT_TEMPERATURE,
+            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET)
+        )
+        
+        # Use a high-capability model for this complex synthesis task
+        response = client.models.generate_content(
+            model=MID_MODEL_NAME, 
+            contents=prompt,
+            config=config,
+        )
+        
+        # The response should be raw Markdown, so we just return the text
+        return response.text
+            
+    except Exception as e:
+        print(f"ERROR: Deep research report generation failed for product '{product_name}': {e}")
+        raise
 
 # ==============================================================================
 # Enrichment Flow Functions (Stateless)

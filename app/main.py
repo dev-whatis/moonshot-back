@@ -14,7 +14,8 @@ from contextlib import asynccontextmanager
 # Import routers and middleware initializers
 from app.routers import recommendations
 from app.routers import enrich
-from app.routers import share # --- MODIFICATION: Import the new share router ---
+from app.routers import share
+from app.routers import research
 from app.middleware.auth import initialize_firebase
 from app.config import AUTH_ENABLED
 
@@ -84,7 +85,8 @@ app.add_middleware(
 # Include the recommendation routes from the router file
 app.include_router(recommendations.router)
 app.include_router(enrich.router)
-app.include_router(share.router) # --- MODIFICATION: Include the new share router ---
+app.include_router(share.router)
+app.include_router(research.router)
 
 
 # ==============================================================================
