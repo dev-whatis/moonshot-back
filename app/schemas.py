@@ -279,15 +279,29 @@ class ShareCreateResponse(BaseModel):
         populate_by_name=True,
     )
 
+class DeepResearchShareData(BaseModel):
+    """Data model for a single deep research report included in a share response."""
+    product_name: str = Field(..., alias="productName", description="The name of the product that was researched.")
+    report: str = Field(..., description="The full Markdown report for the product.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
 class ShareDataResponse(BaseModel):
     """
     Data model for the public GET /api/share/{shareId} endpoint.
-    Contains all the data needed to render a shared recommendation page.
+    Contains all the data needed to render a shared recommendation page,
+    including any associated deep research reports.
     """
     user_query: str = Field(..., alias="userQuery", description="The original user query that initiated the recommendation.")
     recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
     product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the Report.")
     enriched_products: List[EnrichedProduct] = Field(..., alias="enrichedProducts", description="The enriched data for the recommended products.")
+    deep_research_reports: List[DeepResearchShareData] = Field(
+        ..., alias="deepResearchReports", description="A list of all completed deep research reports associated with the conversation."
+    )
 
     model_config = ConfigDict(
         alias_generator=to_camel,

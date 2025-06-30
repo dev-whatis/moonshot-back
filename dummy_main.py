@@ -240,6 +240,7 @@ async def dummy_start_recommendation(request: StartRequest):
     # We generate a new dummy conversation ID for each call to mimic real behavior
     response_data = DUMMY_START_RESPONSE.copy()
     response_data["conversationId"] = f"dummy-conv-{uuid.uuid4()}"
+    time.sleep(5)  # Simulate a small processing delay
     return response_data
 
 
@@ -250,7 +251,7 @@ async def dummy_start_recommendation(request: StartRequest):
 dummy_jobs = {}
 
 # The time in seconds the dummy finalize job should take to "complete".
-DUMMY_PROCESSING_TIME_SECONDS = 5
+DUMMY_PROCESSING_TIME_SECONDS = 50
 
 
 @app.post("/api/recommendations/finalize", response_model=FinalizeResponse, status_code=202, tags=["Dummy Recommendations"])

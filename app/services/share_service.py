@@ -4,7 +4,7 @@ publicly shareable recommendation links.
 """
 
 import secrets
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 from google.cloud import firestore
 
@@ -90,7 +90,9 @@ def create_share_link(conversation_id: str, user_id: str) -> str:
 
 def get_shared_data(share_id: str) -> Dict[str, Any]:
     """
-    Retrieves the necessary data to render a shared recommendation page.
+    Retrieves all necessary data to render a shared recommendation page.
+    This now fetches the main recommendation as well as all associated,
+    completed deep research reports.
 
     It also increments the view count for the share link in a non-blocking way.
 
@@ -98,8 +100,7 @@ def get_shared_data(share_id: str) -> Dict[str, Any]:
         share_id: The public, unique ID of the share link.
 
     Returns:
-        A dictionary containing the recommendation report, product names,
-        and enriched product data.
+        A dictionary containing the recommendation, enrichments, and deep research data.
 
     Raises:
         ShareLinkNotFound: If the share link is invalid, not found, or disabled.
@@ -120,7 +121,7 @@ def get_shared_data(share_id: str) -> Dict[str, Any]:
     share_data = share_doc.to_dict()
     conversation_id = share_data.get("conversationId")
 
-    # 3. Fetch the underlying history document with the actual data
+    # 3. Fetch the underlying history document with the main recommendation data
     history_doc_ref = firestore_client.collection("histories").document(conversation_id)
     history_doc = history_doc_ref.get()
 
@@ -130,6 +131,23 @@ def get_shared_data(share_id: str) -> Dict[str, Any]:
 
     history_data = history_doc.to_dict()
 
+    # --- NEW LOGIC: Fetch all associated deep research reports ---
+    print(f"Fetching completed deep research reports for conversation '{conversation_id}'.")
+    deep_research_reports = []
+    research_query = firestore_client.collection("research").where("conversationId", "==", conversation_id).stream()
+
+    for report_doc in research_query:
+        report_data = report_doc.to_dict()
+        # Only include reports that are successfully completed
+        if report_data.get("status") == "complete":
+            deep_research_reports.append({
+                "product_name": report_data.get("productName", "Unknown Product"),
+                "report": report_data.get("report", "Report content not found.")
+            })
+    
+    print(f"Found {len(deep_research_reports)} completed reports to include in share data.")
+    # --- END NEW LOGIC ---
+
     # 4. Increment the view count (fire-and-forget)
     try:
         share_doc_ref.update({"viewCount": firestore.Increment(1)})
@@ -138,15 +156,13 @@ def get_shared_data(share_id: str) -> Dict[str, Any]:
         # This is a non-critical part of the read operation.
         print(f"WARNING: Failed to increment view count for share_id '{share_id}': {e}")
     
-    # 5. Assemble and return the payload for the frontend
-    # Use .get() with defaults to handle cases where a field might be missing.
-    # --- MODIFICATION START ---
+    # 5. Assemble and return the final, combined payload for the frontend
     response_payload = {
-        "user_query": history_data.get("userQuery", "Original query not found."), # Add the userQuery
+        "user_query": history_data.get("userQuery", "Original query not found."),
         "recommendations": history_data.get("recommendations", "No recommendation report found."),
-        "productNames": history_data.get("productNames", []),
-        "enrichedProducts": history_data.get("enrichedProducts", [])
+        "product_names": history_data.get("productNames", []),
+        "enriched_products": history_data.get("enrichedProducts", []),
+        "deep_research_reports": deep_research_reports # Add the new list of reports
     }
-    # --- MODIFICATION END ---
 
     return response_payload

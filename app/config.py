@@ -17,7 +17,15 @@ CONVERSATION_ID_ENABLED = True
 # In production, this should be True.
 AUTH_ENABLED = True
 
+
+# For GCP environment
 FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
+
+
+# For local development
+# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
+
+
 
 # --- Tavily API Configuration ---
 # This is a secret and should be set in your .env file
