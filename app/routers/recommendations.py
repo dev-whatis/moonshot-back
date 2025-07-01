@@ -148,7 +148,6 @@ async def start_recommendation(
 
 
 # --- MODIFICATION START: The /finalize endpoint is now asynchronous ---
-
 @router.post(
     "/finalize",
     response_model=FinalizeResponse,
@@ -167,14 +166,20 @@ async def finalize_recommendation(
     conv_id = request.conversation_id
     print(f"Finalize job accepted for user: {user_id}, conv_id: {conv_id}. Starting background task.")
 
-    # 1. Create the initial document in Firestore to track the job's state.
+    # --- THIS IS THE FIX ---
+    # The initial payload must contain all required fields for the history feature.
     initial_history_payload = {
         "userId": user_id,
-        "userQuery": request.user_query
+        "userQuery": request.user_query,
+        "title": request.user_query,  # Set the default title
+        "isDeleted": False,           # Set the default deleted status
     }
+    # 1. Create the initial document in Firestore to track the job's state.
     create_history_document(conv_id, initial_history_payload)
 
     # 2. Schedule the long-running task to execute in the background.
+    #    The service function `run_recon_and_deep_dive_flow` no longer needs to
+    #    prepare this initial data, it will just focus on the recommendation logic.
     background_tasks.add_task(run_recon_and_deep_dive_flow, request, user_id)
 
     # 3. Return immediately to the client.

@@ -23,7 +23,12 @@ def run_recon_and_deep_dive_flow(request: FinalizeRequest, user_id: str):
     print(f"BACKGROUND JOB STARTED for user: {user_id}, conv_id: {conv_id}. Using Recon & Deep-Dive flow.")
 
     # This dictionary will be used for GCS logging at the end.
-    finalize_log_payload = {}
+    finalize_log_payload = {
+        "userId": user_id,
+        "userQuery": request.user_query,
+        "title": request.user_query, # Set the default title to the user's query
+        "isDeleted": False,          # Default to not deleted
+    }
 
     try:
         # Prepare initial data

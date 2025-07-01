@@ -6,6 +6,7 @@ internal OpenAPI schemas for structured outputs from Gemini.
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 from typing import List, Optional, Literal, Union
+from datetime import datetime
 
 # ==============================================================================
 # Pydantic Models for the FastAPI Application
@@ -302,6 +303,37 @@ class ShareDataResponse(BaseModel):
     deep_research_reports: List[DeepResearchShareData] = Field(
         ..., alias="deepResearchReports", description="A list of all completed deep research reports associated with the conversation."
     )
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class HistoryUpdateRequest(BaseModel):
+    """Data model for the PATCH /api/history/{conversationId} endpoint body."""
+    title: str = Field(..., description="The new user-defined title for the conversation.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class HistorySummaryItem(BaseModel):
+    """Data model for a single item in the user's history list."""
+    conversation_id: str = Field(..., alias="conversationId")
+    title: str = Field(..., description="The title of the conversation, either user-defined or the original query.")
+    created_at: datetime = Field(..., alias="createdAt", description="The timestamp when the conversation was started.")
+    status: str = Field(..., description="The final status of the conversation (e.g., 'complete', 'failed').")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class HistoryListResponse(BaseModel):
+    """Data model for the GET /api/history endpoint response."""
+    history: List[HistorySummaryItem]
+    next_cursor: Optional[str] = Field(None, alias="nextCursor", description="The cursor to use for fetching the next page of results. Null if this is the last page.")
 
     model_config = ConfigDict(
         alias_generator=to_camel,
