@@ -5,16 +5,19 @@ app/prompts.py
 app/schemas.py
 app/middleware/auth.py
 app/routers/enrich.py
+app/routers/history.py
 app/routers/recommendations.py
 app/routers/research.py
 app/routers/share.py
 app/services/enrichment_service.py
+app/services/history_service.py
 app/services/llm_calls.py
 app/services/logging_service.py
 app/services/parsing_service.py
 app/services/recommendation_service.py
+app/services/research_service.py
 app/services/search_functions.py
-share_service.py
+app/services/share_service.py
 
 
 requirements.txt
