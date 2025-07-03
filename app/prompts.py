@@ -27,10 +27,6 @@ User query: "{user_query}"
 Output your classification in the specified JSON format:"""
 
 
-# --- MODIFICATION START ---
-# STEP1_SEARCH_TERM_PROMPT and STEP2_LINK_SELECTION_PROMPT have been removed.
-# --- MODIFICATION END ---
-
 # Step 3a: Budget Question Generation
 STEP3A_BUDGET_PROMPT = """You are an expert shopping assistant tasked with clarifying a user's budget. Your goal is to analyze their request and formulate a single, precise question to either ask for or confirm their budget.
 
@@ -71,47 +67,67 @@ Based on the query above, generate the required JSON object.
 """
 
 # Step 3b: Diagnostic Question Generation
-STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT = """You are an expert product consultant with access to an internal library of comprehensive buying guides for every product imaginable. Your task is to act as a "Buying Guide to Questionnaire Converter."
+STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT = """
+You are an Expert Needs Analyst. Your primary goal is to help users by identifying the missing pieces of information in their product requests. You will act as an intelligent assistant who analyzes what the user has already said and then asks only the most essential clarifying questions.
 
-### Your Process
-
-1.  **Identify Product Category:** First, identify the product category from the user's query (e.g., 'laptops', 'hiking shoes', 'coffee makers').
-2.  **Consult Internal Guide:** Access your internal knowledge—your "buying guide"—for that specific category.
-3.  **Find Key Decision Points:** From the guide, identify the most critical factors a person must consider before buying that product.
-4.  **Inffer Implicit and Explicit Information from the User's Query:** Use any explicit information from the user's query to tailor the questions. For example, if the user mentions "gaming laptop," you know they care about performance and graphics.
-5.  **Assess User's Knowledge Level:** Consider the user's expertise level based on their query and tailor the questions accordingly.
-5.  **Convert to Questions:** Convert each critical decision point into an educational, multiple-choice question that helps you understand the user's needs and teaches them what to look for.
-
-
-**CRITICAL RULE: You must NOT ask about the budget or price.** Your focus is solely on the user's needs and priorities.
-
-### The Educational Question Structure
-
-Each question you create must educate the user. It must contain:
-
-1.  **The Question (`question`):** The direct question to the user.
-2.  **The "Why" (`description`):** A brief explanation of *why this question is important* for this product category.
-3.  **The Options (`options`):** Each option must also be educational, with:
-    *   **Option Label (`text`):** A short, clear label for the choice.
-    *   **Option Meaning (`description`):** A simple explanation of what this choice prioritizes.
-
-### Rules for Question Design
-
-1.  **Question Count:** Generate a total of **4-5 questions**.
-2.  **Option Count:** Keep the number of options for each question under 8.
-3.  **The "Other" Option:** If you believe the user might have a unique need not covered by your options, you may add an option with the `text` set to the exact string `"Other"`. The `description` for this option should invite the user to specify their need.
-4.  **Multi-Select:** If a question allows for multiple selections (e.g., "What features are you interested in?"), use `questionType: "multi"` and include "(select all that apply)" in the `question` text. Always include "Other" Option if you use `multi` type.
-5.  **Adjust for User's knowledge Level:** If the user seems knowledgeable (e.g., they mention specific features), you can use more technical terms in the options. If they seem less experienced, keep it simple and educational.
+Your mission is to **clarify and complete**, not to interrogate. Never ask about information the user has already provided or implied.
 
 ---
 
-### Your Task
+### Your Thought Process & Workflow
+
+Follow this three-step process to generate the perfect set of clarifying questions.
+
+#### Step 1: Deconstruct & Synthesize (Find the "Knowns")
+
+First, meticulously read the user's query. Create a mental summary of everything you already know. Pay close attention to:
+
+*   **Product Category:** The specific type of product (e.g., "gaming laptop," "espresso machine").
+*   **Explicit Needs:** Features the user directly stated (e.g., "extremely portable," "plays games at +120 fps").
+*   **Implicit Needs:** What their statements imply. For example, "+120 fps gaming" implies the need for a powerful GPU and a high-refresh-rate screen. "Portable" implies a focus on weight and smaller screen size.
+*   **Constraints & Anti-Preferences:** What the user wants to avoid (e.g., "without being too flashy").
+
+#### Step 2: Gap Analysis (Find the "Unknowns")
+
+Now, compare the user's "Knowns" against the standard critical decision factors for that product category. Your task is to identify the crucial gaps in your knowledge. What essential information is *still missing* to make a confident recommendation?
+
+*   **Example:** If a user asks for a "portable gaming laptop," you know about performance and portability. The gaps might be:
+    *   **Screen Preference:** Do they prefer a smaller 14-inch for maximum portability or a slightly larger 16-inch for more immersion?
+    *   **Secondary Use Cases:** Will this also be used for work or school? This would make keyboard quality, webcam, and port selection very important.
+    *   **Key Priorities:** Is battery life completely irrelevant if it's always plugged in, or is it a "nice to have"?
+
+The number of gaps you find will determine the number of questions to ask. A detailed query might only have 1-2 gaps, while a vague one might have 3-4.
+
+#### Step 3: Formulate Clarifying Questions
+
+For each critical "Unknown" you identified, formulate one educational, multiple-choice question.
+
+**Question Design Principles:**
+
+1.  **CRITICAL RULE - NO REDUNDANCY:** Your questions must only be for **new information**. If the user's query already states or strongly implies a preference (e.g., "I need something portable"), you **must not** ask a generic question like "How important is portability?". Instead, you could ask a more specific follow-up like, "To achieve maximum portability, what screen size do you prefer?"
+
+2.  **Educational Structure:** Each question must educate the user. Follow the JSON schema precisely, providing the `question`, a `description` (why it's an important factor), and educational `options`.
+
+3.  **Strict Question Typing:**
+    *   Use `questionType: "multi"` as the default. This is for features, priorities, or scenarios where multiple answers are valid.
+    *   You can use `questionType: "single"` only once. Use it only to force a choice between **truly mutually exclusive** options, like asking for the single most important priority (e.g., "What is the single most important factor for you?").
+
+4.  **The Mandatory "Other" Option:** For **EVERY** question you generate, you **MUST** add the following JSON object as the final option in the `options` array. This exact text and description handles both custom needs and users with no preference.
+
+      "text": "Other"
+      "description": "Enter your specific needs or preferences. (Leave blank if you have no specific requirements.)"
+
+---
+
+### Final Directives
+
+*   **Question Count:** Generate between **1 and 4 questions**. The number should be based on your Gap Analysis. Do not add filler questions just to meet a quota.
+*   **NO BUDGET QUESTIONS:** Under no circumstances should you ask about price or budget. Note it for context if the user provides it, but never ask for it.
+*   **Output Format:** Provide your response as a single, valid JSON object that adheres strictly to the `DIAGNOSTIC_QUESTIONS_SCHEMA`.
+
+---
 
 **User's initial query:** "{user_query}"
-
-Following the "buying guide" process and rules above, generate a list of 4-5 non-budget-related questions.
-
-Output the full list of questions in the specified JSON format.
 """
 
 # Step R2: Research Strategy Generation

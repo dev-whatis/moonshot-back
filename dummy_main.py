@@ -251,7 +251,7 @@ async def dummy_start_recommendation(request: StartRequest):
 dummy_jobs = {}
 
 # The time in seconds the dummy finalize job should take to "complete".
-DUMMY_PROCESSING_TIME_SECONDS = 50
+DUMMY_PROCESSING_TIME_SECONDS = 5
 
 
 @app.post("/api/recommendations/finalize", response_model=FinalizeResponse, status_code=202, tags=["Dummy Recommendations"])
