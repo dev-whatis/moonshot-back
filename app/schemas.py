@@ -450,28 +450,18 @@ DIAGNOSTIC_QUESTIONS_SCHEMA = {
 
 # Step R2: Research Strategy Generation
 RESEARCH_STRATEGY_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "feasibilityAssessment": {
-            "type": "string",
-            "description": "A brief, one or two-sentence assessment of whether the user's core requirements are feasible given their constraints (e.g., budget)."
-        },
-        "identifiedGaps": {
-            "type": "array",
-            "description": "A list of specific topics or features important to the user that were not well-covered by the initial reconnaissance search.",
-            "items": {
-                "type": "string"
-            }
-        },
-        "deepDiveQueries": {
-            "type": "array",
-            "description": "A list of 2-3 new, strategic search queries designed to fill the identified gaps or explore feasibility trade-offs.",
-            "items": {
-                "type": "string"
-            }
-        }
-    },
-    "required": ["feasibilityAssessment", "identifiedGaps", "deepDiveQueries"]
+  "type": "object",
+  "properties": {
+    "deepDiveQueries": {
+      "type": "array",
+      "description": "A list of 2 strategic search queries designed to find products matching the user's synthesized needs and priorities.",
+      "items": {
+        "type": "string",
+        "description": "A single, precise search query string"
+      }
+    }
+  },
+  "required": ["deepDiveQueries"]
 }
 
 # Step 5: Final Website Selection

@@ -107,7 +107,7 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
 
 def generate_research_strategy(user_query: str, user_answers: list[dict], recon_search_results: list[dict]) -> dict:
     """
-    Step R2: Analyzes initial search results against user needs to devise a research plan.
+    Step R2: Analyzes initial search results against user needs to generate a set of targeted search terms.
     """
     current_year = datetime.datetime.now().year
     prompt = STEP_R2_RESEARCH_STRATEGIST_PROMPT.format(
@@ -122,19 +122,17 @@ def generate_research_strategy(user_query: str, user_answers: list[dict], recon_
 def select_final_evidence_urls(
     user_query: str,
     user_answers: list[dict],
-    research_strategy: dict,
     recon_search_results: list[dict],
     deep_dive_search_results: list[dict]
 ) -> list[dict]:
     """
-    Step R4: Selects the best 3-5 URLs from all available search evidence, guided by the research strategy.
+    Step R4: Selects the best 3-5 URLs from all available search evidence.
     """
     current_year = datetime.datetime.now().year
     previous_year = current_year - 1
     prompt = STEP_R4_EVIDENCE_CURATOR_PROMPT.format(
         user_query=user_query,
         user_answers_json=json.dumps(user_answers, indent=2),
-        research_strategy_json=json.dumps(research_strategy, indent=2),
         recon_search_results_json=json.dumps(recon_search_results, indent=2),
         deep_dive_search_results_json=json.dumps(deep_dive_search_results, indent=2),
         current_year=current_year,

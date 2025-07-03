@@ -56,7 +56,7 @@ def run_recon_and_deep_dive_flow(request: FinalizeRequest, user_id: str):
         )
         finalize_log_payload["researchStrategy"] = research_strategy
         deep_dive_queries = research_strategy.get("deepDiveQueries", [])
-        print(f"User {user_id} | Step R2 | Strategy generated. Identified {len(research_strategy.get('identifiedGaps', []))} gaps. New queries: {deep_dive_queries}")
+        print(f"User {user_id} | Step R2 | Strategy generated. New queries: {deep_dive_queries}")
 
         # === STEP R3: DEEP-DIVE SEARCH ===
         print(f"User {user_id} | Step R3 | Performing {len(deep_dive_queries)} Deep-Dive Searches...")
@@ -68,12 +68,11 @@ def run_recon_and_deep_dive_flow(request: FinalizeRequest, user_id: str):
         curated_urls = llm_calls.select_final_evidence_urls(
             user_query=user_query,
             user_answers=user_answers_dict,
-            research_strategy=research_strategy,
             recon_search_results=recon_search_results,
             deep_dive_search_results=deep_dive_search_results
         )
         finalize_log_payload["selectedEvidenceUrls"] = curated_urls
-        print(f"User {user_id} | Step R4 | Selected {len(curated_urls)} URLs for final analysis.")
+        print(f"User {user_id} | Step R4 | Selected {len(curated_urls)} URLs for final analysis: {curated_urls}")
 
         # === STEP R5: SCRAPE CONTENT ===
         print(f"User {user_id} | Step R5 | Scraping content from {len(curated_urls)} sources...")
