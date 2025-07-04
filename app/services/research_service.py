@@ -82,7 +82,9 @@ def run_deep_research_flow(request: DeepResearchRequest, research_id: str, user_
         print(f"User {user_id} | Step DR2 | Curating final evidence URLs...")
         selected_urls = llm_calls.select_deep_research_urls(
             product_name=product_name,
-            search_results=search_results_for_product
+            search_results=search_results_for_product,
+            user_query=user_query,
+            user_answers=user_answers_dict
         )
         research_log_payload["selectedEvidenceUrls"] = selected_urls
         print(f"User {user_id} | Step DR2 | Selected {len(selected_urls)} URLs for deep analysis.")

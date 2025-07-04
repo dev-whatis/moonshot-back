@@ -191,11 +191,18 @@ def generate_final_recommendations(
         print(f"ERROR: Final recommendation generation failed: {e}")
         raise
 
-def select_deep_research_urls(product_name: str, search_results: List[Dict]) -> List[Dict]:
+def select_deep_research_urls(
+    product_name: str, 
+    search_results: List[Dict],
+    user_query: str,
+    user_answers: List[Dict]
+) -> List[Dict]:
     """
     Step DR1: Selects the best 3-5 expert review URLs for deep analysis.
     """
     prompt = STEP_DR1_URL_SELECTOR_PROMPT.format(
+        user_query=user_query,
+        user_answers_json=json.dumps(user_answers, indent=2),
         product_name=product_name,
         search_results_json=json.dumps(search_results, indent=2)
     )
