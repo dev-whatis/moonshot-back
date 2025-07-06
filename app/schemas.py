@@ -574,3 +574,19 @@ DEEP_RESEARCH_URL_SELECTION_SCHEMA = {
     },
     "required": ["selected_urls"]
 }
+
+# Step FS1: Fast Search Query Generation
+FAST_SEARCH_QUERIES_SCHEMA = {
+  "type": "object",
+  "properties": {
+    "searchQueries": {
+      "type": "array",
+      "description": "A list of 4-6 concise search queries designed to gather evidence from snippets for a rapid recommendation.",
+      "items": {
+        "type": "string",
+        "description": "A single, human-like search query string"
+      }
+    }
+  },
+  "required": ["searchQueries"]
+}

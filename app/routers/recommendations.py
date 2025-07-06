@@ -11,7 +11,7 @@ from google.cloud import firestore
 from app.services import llm_calls
 from app.services.logging_service import log_step, create_history_document, save_rejected_query
 # --- MODIFICATION: Import the new service and schemas ---
-from app.services.recommendation_service import run_recon_and_deep_dive_flow
+from app.services.recommendation_service import run_recon_and_deep_dive_flow, run_fast_search_flow
 from app.schemas import (
     StartRequest,
     FinalizeRequest,
@@ -146,6 +146,40 @@ async def start_recommendation(
             detail=f"An unexpected error occurred during the start process: {e}"
         )
 
+@router.post(
+    "/fast-search",
+    response_model=FinalizeResponse,
+    status_code=status.HTTP_202_ACCEPTED
+)
+async def fast_search_recommendation(
+    request: FinalizeRequest,
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Accepts user's answers and starts the FAST recommendation generation as a
+    background job. This flow skips web scraping for a quicker, lower-cost result,
+    relying on LLM synthesis from search snippets alone. It returns immediately
+    with a 202 Accepted response.
+    """
+    conv_id = request.conversation_id
+    print(f"Fast Search job accepted for user: {user_id}, conv_id: {conv_id}. Starting background task.")
+
+    # The initial payload must contain all required fields for the history feature.
+    initial_history_payload = {
+        "userId": user_id,
+        "userQuery": request.user_query,
+        "title": request.user_query,
+        "isDeleted": False,
+    }
+    # 1. Create the initial document in Firestore to track the job's state.
+    create_history_document(conv_id, initial_history_payload)
+
+    # 2. Schedule the new, faster, long-running task to execute in the background.
+    background_tasks.add_task(run_fast_search_flow, request, user_id)
+
+    # 3. Return immediately to the client.
+    return {"conversation_id": conv_id}
 
 # --- MODIFICATION START: The /finalize endpoint is now asynchronous ---
 @router.post(

@@ -22,6 +22,8 @@ from app.prompts import (
     SHOPPING_CURATION_PROMPT,
     STEP_DR1_URL_SELECTOR_PROMPT,
     STEP_DR2_SYNTHESIS_PROMPT,
+    STEP_FS1_FAST_SEARCH_QUERY_GENERATOR_PROMPT,
+    STEP_FS2_FAST_SEARCH_SYNTHESIZER_PROMPT,
 )
 from app.schemas import (
     GUARDRAIL_RESPONSE_SCHEMA,
@@ -31,7 +33,8 @@ from app.schemas import (
     REC_SEARCH_URLS_SCHEMA,
     IMAGE_CURATION_SCHEMA,
     SHOPPING_CURATION_SCHEMA,
-    DEEP_RESEARCH_URL_SELECTION_SCHEMA
+    DEEP_RESEARCH_URL_SELECTION_SCHEMA,
+    FAST_SEARCH_QUERIES_SCHEMA,
 )
 
 # ==============================================================================
@@ -102,7 +105,7 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
     Uses a high-cost model with thinking mode for this complex reasoning task.
     """
     prompt = STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT.format(user_query=user_query)
-    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA, use_thinking=True)
+    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA, use_thinking=False)
     return result.get("questions", [])
 
 def generate_research_strategy(user_query: str, user_answers: list[dict], recon_search_results: list[dict]) -> dict:
@@ -189,6 +192,62 @@ def generate_final_recommendations(
             
     except Exception as e:
         print(f"ERROR: Final recommendation generation failed: {e}")
+        raise
+
+def generate_fast_search_queries(
+    user_query: str,
+    user_answers: list[dict],
+    recon_search_results: list[dict]
+) -> dict:
+    """
+    Step FS1: Generates a portfolio of 4-6 concise, high-yield search queries
+    for the Fast Search flow.
+    """
+    current_year = datetime.datetime.now().year
+    prompt = STEP_FS1_FAST_SEARCH_QUERY_GENERATOR_PROMPT.format(
+        user_query=user_query,
+        user_answers_json=json.dumps(user_answers, indent=2),
+        recon_search_results_json=json.dumps(recon_search_results, indent=2),
+        current_year=current_year
+    )
+    # This task is complex enough to benefit from thinking mode.
+    return _make_stateless_call_json(LOW_MODEL_NAME, prompt, FAST_SEARCH_QUERIES_SCHEMA, use_thinking=False)
+
+
+def synthesize_fast_recommendations(
+    user_query: str,
+    user_answers: list[dict],
+    recon_search_results: list[dict],
+    fast_search_results: list[dict]
+) -> str:
+    """
+    Step FS2: Generates the final recommendation report for the Fast Search
+    flow by synthesizing from search result snippets only.
+    """
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        prompt = STEP_FS2_FAST_SEARCH_SYNTHESIZER_PROMPT.format(
+            user_query=user_query,
+            user_answers_json=json.dumps(user_answers, indent=2),
+            recon_search_results_json=json.dumps(recon_search_results, indent=2),
+            fast_search_results_json=json.dumps(fast_search_results, indent=2),
+        )
+
+        config = types.GenerateContentConfig(
+            temperature=DEFAULT_TEMPERATURE,
+            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET)
+        )
+
+        response = client.models.generate_content(
+            model=LOW_MODEL_NAME, # Use a capable model for this synthesis task
+            contents=prompt,
+            config=config
+        )
+        # The prompt asks for raw Markdown, so we just return the text.
+        return response.text
+
+    except Exception as e:
+        print(f"ERROR: Fast Search recommendation synthesis failed: {e}")
         raise
 
 def select_deep_research_urls(
