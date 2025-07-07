@@ -360,10 +360,6 @@ GUARDRAIL_RESPONSE_SCHEMA = {
     "required": ["is_product_request", "reason"]
 }
 
-# Schemas for Step 1 (GUIDE_SEARCH_TERM_SCHEMA) and Step 2 (GUIDE_SEARCH_URLS_SCHEMA)
-# have been removed as they are no longer in use.
-
-
 # Step 3a: Budget Question Generation
 BUDGET_QUESTION_SCHEMA = {
   "type": "object",
@@ -445,108 +441,6 @@ DIAGNOSTIC_QUESTIONS_SCHEMA = {
         }
     },
     "required": ["questions"]
-}
-
-
-# Step R2: Research Strategy Generation
-RESEARCH_STRATEGY_SCHEMA = {
-  "type": "object",
-  "properties": {
-    "deepDiveQueries": {
-      "type": "array",
-      "description": "A list of 2 strategic search queries designed to find products matching the user's synthesized needs and priorities.",
-      "items": {
-        "type": "string",
-        "description": "A single, precise search query string"
-      }
-    }
-  },
-  "required": ["deepDiveQueries"]
-}
-
-# Step 5: Final Website Selection
-REC_SEARCH_URLS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "rec_search_urls": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string"
-                    },
-                    "url": {
-                        "type": "string"
-                    }
-                },
-                "required": ["title", "url"]
-            }
-        }
-    },
-    "required": ["rec_search_urls"]
-}
-
-
-IMAGE_CURATION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "curatedImages": {
-            "type": "array",
-            "description": "A list of image curation objects, one for each product in the input.",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "productName": {
-                        "type": "string",
-                        "description": "The name of the product, copied from the input."
-                    },
-                    "images": {
-                        "type": "array",
-                        "description": "A list of 3-4 selected image URLs.",
-                        "items": {"type": "string"}
-                    }
-                },
-                "required": ["productName", "images"]
-            }
-        }
-    },
-    "required": ["curatedImages"]
-}
-
-SHOPPING_CURATION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "curatedShoppingLinks": {
-            "type": "array",
-            "description": "A list of shopping link curation objects, one for each product in the input.",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "productName": {
-                        "type": "string",
-                        "description": "The name of the product, copied from the input."
-                    },
-                    "shoppingLinks": {
-                        "type": "array",
-                        "description": "A list of the top 2 selected shopping links.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "source": {"type": "string"},
-                                "link": {"type": "string"},
-                                "price": {"type": "string"},
-                                "delivery": {"type": "string"}
-                            },
-                            "required": ["source", "link", "price", "delivery"]
-                        }
-                    }
-                },
-                "required": ["productName", "shoppingLinks"]
-            }
-        }
-    },
-    "required": ["curatedShoppingLinks"]
 }
 
 # Step DR1: Deep Research Website Selection

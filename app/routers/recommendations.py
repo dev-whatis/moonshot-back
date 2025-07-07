@@ -11,7 +11,7 @@ from google.cloud import firestore
 from app.services import llm_calls
 from app.services.logging_service import log_step, create_history_document, save_rejected_query
 # --- MODIFICATION: Import the new service and schemas ---
-from app.services.recommendation_service import run_recon_and_deep_dive_flow, run_fast_search_flow
+from app.services.recommendation_service import run_fast_search_flow
 from app.schemas import (
     StartRequest,
     FinalizeRequest,
@@ -180,45 +180,6 @@ async def fast_search_recommendation(
 
     # 3. Return immediately to the client.
     return {"conversation_id": conv_id}
-
-# --- MODIFICATION START: The /finalize endpoint is now asynchronous ---
-@router.post(
-    "/finalize",
-    response_model=FinalizeResponse,
-    status_code=status.HTTP_202_ACCEPTED
-)
-async def finalize_recommendation(
-    request: FinalizeRequest,
-    background_tasks: BackgroundTasks,
-    user_id: str = Depends(get_current_user)
-):
-    """
-    Accepts the user's answers and starts the recommendation generation as a
-    background job. This endpoint returns immediately with a 202 Accepted
-    response, providing the conversationId to be used for polling.
-    """
-    conv_id = request.conversation_id
-    print(f"Finalize job accepted for user: {user_id}, conv_id: {conv_id}. Starting background task.")
-
-    # --- THIS IS THE FIX ---
-    # The initial payload must contain all required fields for the history feature.
-    initial_history_payload = {
-        "userId": user_id,
-        "userQuery": request.user_query,
-        "title": request.user_query,  # Set the default title
-        "isDeleted": False,           # Set the default deleted status
-    }
-    # 1. Create the initial document in Firestore to track the job's state.
-    create_history_document(conv_id, initial_history_payload)
-
-    # 2. Schedule the long-running task to execute in the background.
-    #    The service function `run_recon_and_deep_dive_flow` no longer needs to
-    #    prepare this initial data, it will just focus on the recommendation logic.
-    background_tasks.add_task(run_recon_and_deep_dive_flow, request, user_id)
-
-    # 3. Return immediately to the client.
-    return {"conversation_id": conv_id}
-
 
 # --- NEW ENDPOINT: Poll for job status ---
 @router.get(

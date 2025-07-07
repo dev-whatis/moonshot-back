@@ -15,11 +15,6 @@ from app.prompts import (
     STEP0_GUARDRAIL_PROMPT,
     STEP3A_BUDGET_PROMPT,
     STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT,
-    STEP_R2_RESEARCH_STRATEGIST_PROMPT,
-    STEP_R4_EVIDENCE_CURATOR_PROMPT,
-    STEP6_FINAL_RECOMMENDATIONS_PROMPT,
-    IMAGE_CURATION_PROMPT,
-    SHOPPING_CURATION_PROMPT,
     STEP_DR1_URL_SELECTOR_PROMPT,
     STEP_DR2_SYNTHESIS_PROMPT,
     STEP_FS1_FAST_SEARCH_QUERY_GENERATOR_PROMPT,
@@ -29,10 +24,6 @@ from app.schemas import (
     GUARDRAIL_RESPONSE_SCHEMA,
     BUDGET_QUESTION_SCHEMA,
     DIAGNOSTIC_QUESTIONS_SCHEMA,
-    RESEARCH_STRATEGY_SCHEMA,
-    REC_SEARCH_URLS_SCHEMA,
-    IMAGE_CURATION_SCHEMA,
-    SHOPPING_CURATION_SCHEMA,
     DEEP_RESEARCH_URL_SELECTION_SCHEMA,
     FAST_SEARCH_QUERIES_SCHEMA,
 )
@@ -108,91 +99,6 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
     result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA)
     return result.get("questions", [])
 
-def generate_research_strategy(user_query: str, user_answers: list[dict], recon_search_results: list[dict]) -> dict:
-    """
-    Step R2: Analyzes initial search results against user needs to generate a set of targeted search terms.
-    """
-    current_year = datetime.datetime.now().year
-    prompt = STEP_R2_RESEARCH_STRATEGIST_PROMPT.format(
-        user_query=user_query,
-        user_answers_json=json.dumps(user_answers, indent=2),
-        recon_search_results_json=json.dumps(recon_search_results, indent=2),
-        current_year=current_year
-    )
-    return _make_stateless_call_json(LOW_MODEL_NAME, prompt, RESEARCH_STRATEGY_SCHEMA, use_thinking=True)
-
-
-def select_final_evidence_urls(
-    user_query: str,
-    user_answers: list[dict],
-    recon_search_results: list[dict],
-    deep_dive_search_results: list[dict]
-) -> list[dict]:
-    """
-    Step R4: Selects the best 3-5 URLs from all available search evidence.
-    """
-    current_year = datetime.datetime.now().year
-    previous_year = current_year - 1
-    prompt = STEP_R4_EVIDENCE_CURATOR_PROMPT.format(
-        user_query=user_query,
-        user_answers_json=json.dumps(user_answers, indent=2),
-        recon_search_results_json=json.dumps(recon_search_results, indent=2),
-        deep_dive_search_results_json=json.dumps(deep_dive_search_results, indent=2),
-        current_year=current_year,
-        previous_year=previous_year
-    )
-    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, REC_SEARCH_URLS_SCHEMA, use_thinking=True)
-    return result.get("rec_search_urls", [])
-
-
-def generate_final_recommendations(
-    user_query: str,
-    user_answers: list[dict],
-    recon_search_results: list[dict],
-    deep_dive_search_results: list[dict],
-    rec_scraped_contents: list[dict]
-) -> str:
-    """
-    Step R6: Generate final product recommendations (with thinking mode).
-    The prompt is now informed by the research strategy.
-    """
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        prompt = STEP6_FINAL_RECOMMENDATIONS_PROMPT.format(
-            user_query=user_query,
-            user_answers_json=json.dumps(user_answers, indent=2),
-            recon_search_results_json=json.dumps(recon_search_results, indent=2),
-            deep_dive_search_results_json=json.dumps(deep_dive_search_results, indent=2),
-            rec_scraped_contents_json=json.dumps(rec_scraped_contents, indent=2)
-        )
-        
-        config = types.GenerateContentConfig(
-            temperature=DEFAULT_TEMPERATURE,
-            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET)
-        )
-        
-        response = client.models.generate_content(
-            model=MID_MODEL_NAME,
-            contents=prompt,
-            config=config
-        )
-        raw_response_text = response.text
-
-        # Fail-safe to extract content if the LLM returns a JSON object
-        try:
-            data = json.loads(raw_response_text)
-            if isinstance(data, dict) and data:
-                print("INFO: LLM returned JSON for final recommendation. Extracting content.")
-                return str(list(data.values())[0])
-            else:
-                return raw_response_text
-        except json.JSONDecodeError:
-            print("INFO: LLM returned plain text for final recommendation as expected.")
-            return raw_response_text
-            
-    except Exception as e:
-        print(f"ERROR: Final recommendation generation failed: {e}")
-        raise
 
 def generate_fast_search_queries(
     user_query: str,
@@ -305,28 +211,3 @@ def generate_deep_research_report(
     except Exception as e:
         print(f"ERROR: Deep research report generation failed for product '{product_name}': {e}")
         raise
-
-# ==============================================================================
-# Enrichment Flow Functions (Stateless)
-# ==============================================================================
-
-def curate_images(image_data: List[Dict[str, Any]]) -> Dict:
-    """
-    Makes a stateless call to Gemini to curate the best images for a list of products.
-    """
-    print(f"Sending image data for {len(image_data)} products to Gemini for curation.")
-    prompt = IMAGE_CURATION_PROMPT.format(
-        image_data_json=json.dumps(image_data, indent=2)
-    )
-    return _make_stateless_call_json(LOW_MODEL_NAME, prompt, IMAGE_CURATION_SCHEMA)
-
-
-def curate_shopping_links(shopping_data: List[Dict[str, Any]]) -> Dict:
-    """
-    Makes a stateless call to Gemini to curate the best shopping links for a list of products.
-    """
-    print(f"Sending shopping data for {len(shopping_data)} products to Gemini for curation.")
-    prompt = SHOPPING_CURATION_PROMPT.format(
-        shopping_data_json=json.dumps(shopping_data, indent=2)
-    )
-    return _make_stateless_call_json(LOW_MODEL_NAME, prompt, SHOPPING_CURATION_SCHEMA)

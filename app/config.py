@@ -19,11 +19,11 @@ AUTH_ENABLED = True
 
 
 # For GCP environment
-FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
+# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "/secrets/firebase-service-account.json"
 
 
 # For local development
-# FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
+FIREBASE_SERVICE_ACCOUNT_KEY_PATH = "firebase-service-account.json"
 
 
 
@@ -52,14 +52,10 @@ GCP_PROJECT_ID = "moonshot-69420"
 # The name of the GCS bucket for storing raw trace logs
 GCS_BUCKET_NAME = "moonshot-69420-llm-traces"
 
-# Maximum number of concurrent requests for parallel scraping/searching
+# Maximum number of concurrent requests for parallel scraping/searching Tavily
 MAX_CONCURRENT_REQUESTS = 5
 
-
-# A new flag to control the LLM enrichment method (set False to bypass LLM enrichment).
-USE_LLM_FOR_ENRICHMENT = False
-
-# For teh LLM enrichment process
+# For the LLM enrichment process Serper API
 # PRODUCT_CHUNK_SIZE: How many products to include in a single LLM call.
 # LLM_TASK_CONCURRENCY: How many LLM API calls to run in parallel at once.
 PRODUCT_CHUNK_SIZE = 1
@@ -73,6 +69,9 @@ if GEMINI_API_KEY == "your_gemini_api_key_here":
 
 if SERPER_API_KEY == "your_serper_api_key_here":
     print("WARNING: SERPER_API_KEY is not set. Please update your .env file or Cloud Run secret mapping.")
+
+if TAVILY_API_KEY == "your_tavily_api_key_here":
+    print("WARNING: TAVILY_API_KEY is not set. Please update your .env file or Cloud Run secret mapping.")
 
 if AUTH_ENABLED:
     # In a Cloud Run environment, this check might not be useful at build time,
