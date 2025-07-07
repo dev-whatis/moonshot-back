@@ -147,6 +147,15 @@ class DeepResearchResultResponse(BaseModel):
         populate_by_name=True,
     )
 
+class FollowupRequest(BaseModel):
+    """Data model for the POST /api/recommendations/chat/{conversation_id} endpoint."""
+    user_query: str = Field(..., alias="userQuery", description="The user's follow-up message.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
 
 # --- Response Models ---
 
@@ -334,6 +343,15 @@ class HistoryListResponse(BaseModel):
     """Data model for the GET /api/history endpoint response."""
     history: List[HistorySummaryItem]
     next_cursor: Optional[str] = Field(None, alias="nextCursor", description="The cursor to use for fetching the next page of results. Null if this is the last page.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class FollowupResponse(BaseModel):
+    """Data model for the response from the follow-up chat endpoint."""
+    model_response: str = Field(..., alias="modelResponse", description="The final, user-facing text response from the model.")
 
     model_config = ConfigDict(
         alias_generator=to_camel,

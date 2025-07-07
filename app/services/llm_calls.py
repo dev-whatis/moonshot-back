@@ -211,3 +211,76 @@ def generate_deep_research_report(
     except Exception as e:
         print(f"ERROR: Deep research report generation failed for product '{product_name}': {e}")
         raise
+
+# --- NEW CONSTANTS AND FUNCTIONS for the Follow-up Chat Feature ---
+
+# Define the single tool's schema for the LLM.
+# This tells the model what function it can call and what parameters to provide.
+WEB_SEARCH_TOOL_DECLARATION = types.Tool(
+    function_declarations=[
+        types.FunctionDeclaration(
+            name="web_search",
+            description=(
+                "Performs a web search to find up-to-date information when the answer "
+                "is not in the conversation history. Use this to find new product alternatives, "
+                "verify specific, time-sensitive facts (like specs or availability of a latest model), "
+                "or answer questions about technology concepts."
+            ),
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "search_queries": types.Schema(
+                        type=types.Type.ARRAY,
+                        items=types.Schema(type=types.Type.STRING),
+                        description="A list of 1 to 3 concise, targeted search queries."
+                    )
+                },
+                required=["search_queries"]
+            )
+        )
+    ]
+)
+
+
+def run_chat_turn(history: List[Dict[str, Any]], tools: List[types.Tool]) -> types.GenerateContentResponse:
+    """
+    Runs a single turn of a multi-turn chat conversation using the stateless
+    `generate_content` method, which is ideal for this application's architecture.
+
+    This function takes a prepared history and a list of available tools, makes
+    a single call to the Gemini API, and returns the entire response object for
+    the calling service to inspect for tool calls.
+
+    Args:
+        history: A list of message objects representing the conversation history.
+        tools: A list of `types.Tool` objects available to the model.
+
+    Returns:
+        The full `GenerateContentResponse` object from the Gemini API.
+    """
+    try:
+        # 1. Create the low-level client.
+        client = genai.Client(api_key=GEMINI_API_KEY)
+
+        # 2. Create the generation configuration, which includes the tools.
+        config = types.GenerateContentConfig(
+            tools=tools,
+            temperature=DEFAULT_TEMPERATURE,
+            thinking_config=types.ThinkingConfig(thinking_budget=0)
+        )
+
+        # 3. Make the single, stateless call to the model.
+        #    This pattern exactly matches the Gemini documentation for a single turn.
+        response = client.models.generate_content(
+            model=MID_MODEL_NAME,
+            contents=history, # Pass the entire conversation history here
+            config=config
+        )
+
+        # 4. Return the entire response object for inspection.
+        return response
+
+    except Exception as e:
+        print(f"ERROR: Chat turn failed with exception: {e}")
+        # Propagate the exception to be handled by the calling service
+        raise

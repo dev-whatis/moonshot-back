@@ -25,6 +25,10 @@ from app.schemas import (
 # Import the dependency for authentication
 from app.middleware.auth import get_current_user
 
+# --- NEW: Import the new service and schemas for the chat feature ---
+from app.services import followup_service
+from app.schemas import FollowupRequest, FollowupResponse
+
 # ==============================================================================
 # Router Setup
 # ==============================================================================
@@ -257,3 +261,43 @@ async def get_job_result(
     except Exception as e:
         print(f"ERROR fetching result for conv_id {conversation_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve job result.")
+    
+@router.post(
+    "/chat/{conversation_id}",
+    response_model=FollowupResponse,
+    summary="Handle a follow-up chat message"
+)
+async def handle_followup_chat_message(
+    conversation_id: str,
+    request: FollowupRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Handles a single, stateful follow-up message from the user for an existing
+    recommendation.
+
+    This endpoint orchestrates a "Read-Process-Write" cycle:
+    1.  Reads the entire conversation history from Firestore.
+    2.  Uses an LLM with a `web_search` tool to generate a contextual response.
+    3.  Writes the new turn (user query + model response) back to the history.
+    4.  Returns the final model response to the user.
+    """
+    try:
+        final_response = followup_service.handle_chat_turn(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            new_user_query=request.user_query
+        )
+        return {"model_response": final_response}
+
+    except followup_service.ConversationNotFound as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except followup_service.NotOwnerOfConversation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        # Catch-all for any other unexpected errors in the service layer
+        print(f"ERROR: Unhandled exception in chat endpoint for conv_id {conversation_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during the chat process: {str(e)}"
+        )

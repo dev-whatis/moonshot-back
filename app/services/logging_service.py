@@ -4,7 +4,7 @@
 
 import json
 import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from google.cloud import firestore, storage
 
 from app.config import GCP_PROJECT_ID, GCS_BUCKET_NAME, CONVERSATION_ID_ENABLED
@@ -295,3 +295,38 @@ def set_research_job_failed(research_id: Optional[str], error_message: str):
         print(f"Successfully updated research job to 'failed' for research_id {research_id}.")
     except Exception as e:
         print(f"ERROR: Failed to update research job to 'failed' in Firestore for research_id {research_id}: {e}")
+
+    # --- NEW FUNCTION for the Follow-up Chat Feature ---
+
+def update_chat_history(conversation_id: Optional[str], new_history_array: List[Dict[str, Any]]):
+    """
+    Updates an existing history document with the latest follow-up chat history.
+    This also sets a flag to indicate that a chat has occurred.
+
+    Args:
+        conversation_id: The ID of the conversation to update.
+        new_history_array: The complete, updated list of chat message objects.
+    """
+    if not CONVERSATION_ID_ENABLED or not conversation_id:
+        print("INFO: Firestore chat history update skipped (disabled by config or no ID).")
+        return
+
+    if not firestore_client:
+        print(f"Skipping Firestore update for conv_id {conversation_id}, client not initialized.")
+        return
+
+    try:
+        doc_ref = firestore_client.collection("histories").document(conversation_id)
+        
+        # The payload contains the full chat history array and a flag.
+        # This will either create the fields or overwrite them.
+        update_payload = {
+            "followupHistory": new_history_array,
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        }
+        
+        doc_ref.update(update_payload)
+        print(f"Successfully UPDATED chat history for conv_id {conversation_id} in Firestore.")
+
+    except Exception as e:
+        print(f"ERROR: Failed to UPDATE chat history in Firestore for conv_id {conversation_id}: {e}")

@@ -153,6 +153,53 @@ def scrape_recommendation_urls(rec_search_urls: List[Dict[str, Any]]) -> List[Di
             {"title": item.get("title"), "url": item['url'], "text": f"Scraping failed due to an API error: {e}"}
             for item in rec_search_urls
         ]
+    
+def execute_parallel_searches(search_queries: List[str]) -> str:
+    """
+    Takes a list of search queries from the LLM, executes them in parallel
+    using Tavily, and returns a formatted JSON string of the aggregated results.
+    This is designed to be the action for the `web_search` tool.
+
+    Args:
+        search_queries: A list of 1-3 search strings.
+
+    Returns:
+        A JSON string representing a list of search result objects,
+        ready to be passed back to the LLM.
+    """
+    print(f"Executing parallel web search for {len(search_queries)} queries from LLM.")
+
+    if not search_queries:
+        return json.dumps([])
+
+    all_results = []
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
+        # Use the existing Tavily search function for each query
+        future_to_query = {
+            executor.submit(
+                search_product_recommendations,
+                [query], # The function expects a list of terms
+                search_depth="basic", # 'basic' is faster and sufficient for this
+                max_results_per_term=5 # Limit results to keep context small
+            ): query for query in search_queries
+        }
+
+        for future in as_completed(future_to_query):
+            try:
+                # The result is a list containing one search result object
+                result_for_query = future.result()
+                if result_for_query:
+                    # Append the inner object to our final list
+                    all_results.append(result_for_query[0])
+            except Exception as e:
+                query = future_to_query[future]
+                print(f"ERROR: A search failed within execute_parallel_searches for query '{query}': {e}")
+                # Optionally append an error message for the LLM
+                all_results.append({"query": query, "error": str(e), "results": []})
+
+    print(f"Parallel web search complete. Aggregated results from {len(all_results)} queries.")
+    # Return a stringified JSON so the LLM can easily parse it
+    return json.dumps(all_results, indent=2)
 
 
 # ==============================================================================
