@@ -15,7 +15,6 @@ from contextlib import asynccontextmanager
 from app.routers import recommendations
 from app.routers import enrich
 from app.routers import share
-from app.routers import research
 from app.routers import history
 from app.middleware.auth import initialize_firebase
 from app.config import AUTH_ENABLED
@@ -87,7 +86,6 @@ app.add_middleware(
 app.include_router(recommendations.router)
 app.include_router(enrich.router)
 app.include_router(share.router)
-app.include_router(research.router)
 app.include_router(history.router)
 
 

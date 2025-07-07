@@ -21,7 +21,6 @@ class NotOwnerOfHistory(Exception):
     pass
 
 
-# MODIFICATION: Changed to a synchronous function (removed async)
 def get_history_for_user(
     user_id: str,
     limit: int = 20,
@@ -85,7 +84,6 @@ def get_history_for_user(
     return history_summaries, next_cursor
 
 
-# MODIFICATION: Changed to a synchronous function (removed async)
 def get_conversation_snapshot(user_id: str, conversation_id: str) -> Dict[str, Any]:
     """
     Retrieves a complete snapshot of a single conversation.
@@ -94,7 +92,6 @@ def get_conversation_snapshot(user_id: str, conversation_id: str) -> Dict[str, A
         raise Exception("Firestore client is not initialized. Cannot retrieve shared data.")
 
     history_doc_ref = firestore_client.collection("histories").document(conversation_id)
-    # MODIFICATION: Removed await
     history_doc = history_doc_ref.get()
 
     if not history_doc.exists:
@@ -105,30 +102,17 @@ def get_conversation_snapshot(user_id: str, conversation_id: str) -> Dict[str, A
     if history_data.get("userId") != user_id:
         raise NotOwnerOfHistory("User does not have permission to access this conversation.")
 
-    deep_research_reports = []
-    research_query = firestore_client.collection("research").where("conversationId", "==", conversation_id).stream()
-
-    # MODIFICATION: Changed to a standard for loop
-    for report_doc in research_query:
-        report_data = report_doc.to_dict()
-        if report_data.get("status") == "complete":
-            deep_research_reports.append({
-                "product_name": report_data.get("productName", "Unknown Product"),
-                "report": report_data.get("report", "Report content not found.")
-            })
     
     response_payload = {
         "user_query": history_data.get("userQuery", "Original query not found."),
         "recommendations": history_data.get("recommendations", "No recommendation report found."),
         "product_names": history_data.get("productNames", []),
         "enriched_products": history_data.get("enrichedProducts", []),
-        "deep_research_reports": deep_research_reports
     }
 
     return response_payload
 
 
-# MODIFICATION: Changed to a synchronous function (removed async)
 def update_history_title(user_id: str, conversation_id: str, new_title: str) -> Dict[str, Any]:
     """
     Updates the title of a specific conversation history item.
@@ -137,7 +121,6 @@ def update_history_title(user_id: str, conversation_id: str, new_title: str) -> 
         raise Exception("Firestore client is not initialized.")
 
     doc_ref = firestore_client.collection("histories").document(conversation_id)
-    # MODIFICATION: Removed await
     doc = doc_ref.get()
 
     if not doc.exists:
@@ -147,7 +130,6 @@ def update_history_title(user_id: str, conversation_id: str, new_title: str) -> 
     if data.get("userId") != user_id:
         raise NotOwnerOfHistory("User does not have permission to modify this history item.")
 
-    # MODIFICATION: Removed await
     doc_ref.update({"title": new_title})
 
     return {
@@ -158,7 +140,6 @@ def update_history_title(user_id: str, conversation_id: str, new_title: str) -> 
     }
 
 
-# MODIFICATION: Changed to a synchronous function (removed async)
 def delete_history_item(user_id: str, conversation_id: str):
     """
     Performs a soft delete on a specific history item by setting 'isDeleted' to True.
@@ -167,7 +148,6 @@ def delete_history_item(user_id: str, conversation_id: str):
         raise Exception("Firestore client is not initialized.")
 
     doc_ref = firestore_client.collection("histories").document(conversation_id)
-    # MODIFICATION: Removed await
     doc = doc_ref.get()
 
     if not doc.exists:
@@ -176,7 +156,6 @@ def delete_history_item(user_id: str, conversation_id: str):
     if doc.to_dict().get("userId") != user_id:
         raise NotOwnerOfHistory("User does not have permission to delete this history item.")
 
-    # MODIFICATION: Removed await
     doc_ref.update({"isDeleted": True})
 
     return

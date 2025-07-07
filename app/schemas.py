@@ -112,41 +112,6 @@ class ShareCreateRequest(BaseModel):
         populate_by_name=True,
     )
 
-class DeepResearchRequest(BaseModel):
-    """Data model for the POST /api/research endpoint request body."""
-    # This model remains the same
-    conversation_id: str = Field(..., alias="conversationId", description="The ID of the conversation to provide user context.")
-    product_name: str = Field(..., alias="productName", description="The specific product name to be researched.")
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-class DeepResearchResponse(BaseModel):
-    """
-    Data model for the immediate, asynchronous response from the POST /api/research endpoint.
-    It acknowledges the request and provides the UNIQUE ID to poll for status.
-    """
-    # --- THIS MODEL IS CHANGED ---
-    # It now correctly returns `researchId` instead of `conversationId`.
-    research_id: str = Field(..., alias="researchId")
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-class DeepResearchResultResponse(BaseModel):
-    """Data model for the GET /api/research/result/{research_id} endpoint response."""
-    # This model remains the same
-    report: str = Field(..., description="The full, comprehensive deep research report in Markdown format.")
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
 class FollowupRequest(BaseModel):
     """Data model for the POST /api/recommendations/chat/{conversation_id} endpoint."""
     user_query: str = Field(..., alias="userQuery", description="The user's follow-up message.")
@@ -289,16 +254,6 @@ class ShareCreateResponse(BaseModel):
         populate_by_name=True,
     )
 
-class DeepResearchShareData(BaseModel):
-    """Data model for a single deep research report included in a share response."""
-    product_name: str = Field(..., alias="productName", description="The name of the product that was researched.")
-    report: str = Field(..., description="The full Markdown report for the product.")
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
 class ShareDataResponse(BaseModel):
     """
     Data model for the public GET /api/share/{shareId} endpoint.
@@ -309,9 +264,6 @@ class ShareDataResponse(BaseModel):
     recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
     product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the Report.")
     enriched_products: List[EnrichedProduct] = Field(..., alias="enrichedProducts", description="The enriched data for the recommended products.")
-    deep_research_reports: List[DeepResearchShareData] = Field(
-        ..., alias="deepResearchReports", description="A list of all completed deep research reports associated with the conversation."
-    )
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -459,32 +411,6 @@ DIAGNOSTIC_QUESTIONS_SCHEMA = {
         }
     },
     "required": ["questions"]
-}
-
-# Step DR1: Deep Research Website Selection
-DEEP_RESEARCH_URL_SELECTION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "selected_urls": {
-            "type": "array",
-            "description": "A list of the 3-5 most valuable and diverse websites for in-depth analysis.",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "The title of the selected web page."
-                    },
-                    "url": {
-                        "type": "string",
-                        "description": "The URL of the selected web page."
-                    }
-                },
-                "required": ["title", "url"]
-            }
-        }
-    },
-    "required": ["selected_urls"]
 }
 
 # Step FS1: Fast Search Query Generation

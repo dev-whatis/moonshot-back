@@ -15,8 +15,6 @@ from app.prompts import (
     STEP0_GUARDRAIL_PROMPT,
     STEP3A_BUDGET_PROMPT,
     STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT,
-    STEP_DR1_URL_SELECTOR_PROMPT,
-    STEP_DR2_SYNTHESIS_PROMPT,
     STEP_FS1_FAST_SEARCH_QUERY_GENERATOR_PROMPT,
     STEP_FS2_FAST_SEARCH_SYNTHESIZER_PROMPT,
 )
@@ -24,7 +22,6 @@ from app.schemas import (
     GUARDRAIL_RESPONSE_SCHEMA,
     BUDGET_QUESTION_SCHEMA,
     DIAGNOSTIC_QUESTIONS_SCHEMA,
-    DEEP_RESEARCH_URL_SELECTION_SCHEMA,
     FAST_SEARCH_QUERIES_SCHEMA,
 )
 
@@ -156,66 +153,7 @@ def synthesize_fast_recommendations(
         print(f"ERROR: Fast Search recommendation synthesis failed: {e}")
         raise
 
-def select_deep_research_urls(
-    product_name: str, 
-    search_results: List[Dict],
-    user_query: str,
-    user_answers: List[Dict]
-) -> List[Dict]:
-    """
-    Step DR1: Selects the best 3-5 expert review URLs for deep analysis.
-    """
-    prompt = STEP_DR1_URL_SELECTOR_PROMPT.format(
-        user_query=user_query,
-        user_answers_json=json.dumps(user_answers, indent=2),
-        product_name=product_name,
-        search_results_json=json.dumps(search_results, indent=2)
-    )
-    result = _make_stateless_call_json(MID_MODEL_NAME, prompt, DEEP_RESEARCH_URL_SELECTION_SCHEMA)
-    return result.get("selected_urls", [])
-
-
-def generate_deep_research_report(
-    user_query: str,
-    user_answers: List[Dict],
-    product_name: str,
-    scraped_contents: List[Dict]
-) -> str:
-    """
-    Step DR2: Generates the final, comprehensive deep research report.
-    """
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        prompt = STEP_DR2_SYNTHESIS_PROMPT.format(
-            user_query=user_query,
-            user_answers_json=json.dumps(user_answers, indent=2),
-            product_name=product_name,
-            scraped_contents_json=json.dumps(scraped_contents, indent=2)
-        )
-        
-        config = types.GenerateContentConfig(
-            temperature=DEFAULT_TEMPERATURE,
-            thinking_config=types.ThinkingConfig(thinking_budget=0)
-        )
-        
-        # Use a high-capability model for this complex synthesis task
-        response = client.models.generate_content(
-            model=MID_MODEL_NAME, 
-            contents=prompt,
-            config=config,
-        )
-        
-        # The response should be raw Markdown, so we just return the text
-        return response.text
-            
-    except Exception as e:
-        print(f"ERROR: Deep research report generation failed for product '{product_name}': {e}")
-        raise
-
 # --- NEW CONSTANTS AND FUNCTIONS for the Follow-up Chat Feature ---
-
-# Define the single tool's schema for the LLM.
-# This tells the model what function it can call and what parameters to provide.
 WEB_SEARCH_TOOL_DECLARATION = types.Tool(
     function_declarations=[
         types.FunctionDeclaration(
@@ -270,7 +208,6 @@ def run_chat_turn(history: List[Dict[str, Any]], tools: List[types.Tool]) -> typ
         )
 
         # 3. Make the single, stateless call to the model.
-        #    This pattern exactly matches the Gemini documentation for a single turn.
         response = client.models.generate_content(
             model=MID_MODEL_NAME,
             contents=history, # Pass the entire conversation history here
