@@ -105,7 +105,7 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
     Uses a high-cost model with thinking mode for this complex reasoning task.
     """
     prompt = STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT.format(user_query=user_query)
-    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA, use_thinking=False)
+    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA)
     return result.get("questions", [])
 
 def generate_research_strategy(user_query: str, user_answers: list[dict], recon_search_results: list[dict]) -> dict:
@@ -211,7 +211,7 @@ def generate_fast_search_queries(
         current_year=current_year
     )
     # This task is complex enough to benefit from thinking mode.
-    return _make_stateless_call_json(LOW_MODEL_NAME, prompt, FAST_SEARCH_QUERIES_SCHEMA, use_thinking=False)
+    return _make_stateless_call_json(MID_MODEL_NAME, prompt, FAST_SEARCH_QUERIES_SCHEMA)
 
 
 def synthesize_fast_recommendations(
@@ -235,11 +235,11 @@ def synthesize_fast_recommendations(
 
         config = types.GenerateContentConfig(
             temperature=DEFAULT_TEMPERATURE,
-            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET)
+            thinking_config=types.ThinkingConfig(thinking_budget=0)
         )
 
         response = client.models.generate_content(
-            model=LOW_MODEL_NAME, # Use a capable model for this synthesis task
+            model=MID_MODEL_NAME, # Use a capable model for this synthesis task
             contents=prompt,
             config=config
         )
@@ -265,7 +265,7 @@ def select_deep_research_urls(
         product_name=product_name,
         search_results_json=json.dumps(search_results, indent=2)
     )
-    result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DEEP_RESEARCH_URL_SELECTION_SCHEMA, use_thinking=True)
+    result = _make_stateless_call_json(MID_MODEL_NAME, prompt, DEEP_RESEARCH_URL_SELECTION_SCHEMA)
     return result.get("selected_urls", [])
 
 
@@ -289,7 +289,7 @@ def generate_deep_research_report(
         
         config = types.GenerateContentConfig(
             temperature=DEFAULT_TEMPERATURE,
-            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET)
+            thinking_config=types.ThinkingConfig(thinking_budget=0)
         )
         
         # Use a high-capability model for this complex synthesis task
