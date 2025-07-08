@@ -83,10 +83,11 @@ app.add_middleware(
 # ==============================================================================
 
 # Include the recommendation routes from the router file
-app.include_router(recommendations.router)
 app.include_router(enrich.router)
 app.include_router(share.router)
 app.include_router(history.router)
+app.include_router(recommendations.rec_router)
+app.include_router(recommendations.convo_router)
 
 
 # ==============================================================================

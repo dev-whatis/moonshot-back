@@ -1,67 +1,67 @@
 """
 (recommendations.py) Defines the API routes for the product recommendation flow.
+This version uses a unified, turn-based conversational model.
 """
 
-import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from google.cloud import firestore
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+from typing import Optional
 
 # Import services and handlers
-from app.services import llm_calls
-from app.services.logging_service import log_step, create_history_document, save_rejected_query
-# --- MODIFICATION: Import the new service and schemas ---
-from app.services.recommendation_service import run_fast_search_flow
+from app.services import llm_calls, logging_service
+from app.services.recommendation_service import process_turn_background_job
+from app.services.history_service import get_conversation_snapshot # For ownership check
+
+# Import the new, refactored Pydantic schemas
 from app.schemas import (
     StartRequest,
-    FinalizeRequest,
+    TurnRequest,
     StartResponse,
-    FinalizeResponse,
-    StatusResponse,
-    ResultResponse,
+    TurnCreationResponse,
+    TurnStatusResponse,
+    ConversationResponse,
     RejectionResponse
 )
 
 # Import the dependency for authentication
 from app.middleware.auth import get_current_user
 
-# --- NEW: Import the new service and schemas for the chat feature ---
-from app.services import followup_service
-from app.schemas import FollowupRequest, FollowupResponse
+# Import a direct firestore client for lightweight status checks
+from google.cloud import firestore
 
 # ==============================================================================
 # Router Setup
 # ==============================================================================
 
-router = APIRouter(
+# Create two separate routers for better organization in the OpenAPI docs
+rec_router = APIRouter(
     prefix="/api/recommendations",
     tags=["Recommendations"]
 )
 
+convo_router = APIRouter(
+    prefix="/api/conversations",
+    tags=["Conversations"]
+)
+
 # ==============================================================================
-# API Endpoints
+# Recommendation Initiation Endpoint (Stateless)
 # ==============================================================================
 
-@router.post(
+@rec_router.post(
     "/start",
     response_model=StartResponse,
     responses={
         422: {"model": RejectionResponse, "description": "Query is out-of-scope for the API"}
     }
 )
-async def start_recommendation(
+async def start_recommendation_questionnaire(
     request: StartRequest,
-    background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user)
 ):
     """
-    Starts a new recommendation flow.
-    1.  Runs a stateless guardrail check on the user's query.
-    2.  If valid, it runs two parallel LLM calls:
-        - One to generate a budget-specific question.
-        - One to generate a set of educational, diagnostic questions.
-    3.  Combines the results and returns them with a new conversationId.
-    4.  If invalid, it logs the rejection and returns a 422 error.
+    Starts a new recommendation flow by generating a questionnaire.
+    This is a stateless endpoint that does NOT create a conversation in the database.
+    It runs a guardrail check and then generates budget and diagnostic questions.
     """
     print(f"User {user_id} | Step 0 | Performing guardrail check for query: '{request.user_query}'")
     
@@ -69,17 +69,8 @@ async def start_recommendation(
     guardrail_result = llm_calls.run_query_guardrail(request.user_query)
     
     if not guardrail_result.get("is_product_request"):
+        # This logic is simplified as we no longer log rejections with a conv_id
         print(f"User {user_id} | REJECTED | Reason: {guardrail_result.get('reason')}")
-        
-        rejection_id = str(uuid.uuid4())
-        rejection_log = {
-            "rejectionId": rejection_id,
-            "userId": user_id,
-            "userQuery": request.user_query,
-            "reason": guardrail_result.get("reason")
-        }
-        save_rejected_query(rejection_log)
-        
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
@@ -88,216 +79,136 @@ async def start_recommendation(
             }
         )
     
-    print(f"User {user_id} | PASSED | Guardrail check passed. Generating questions in parallel.")
-    
-    conversation_id = str(uuid.uuid4())
+    print(f"User {user_id} | PASSED | Guardrail check passed. Generating questions.")
     
     try:
-        # Step 3: Generate budget and diagnostic questions in parallel
-        budget_question_result = None
-        diagnostic_questions_result = None
+        # Generate budget and diagnostic questions (can be parallelized if needed)
+        budget_question = llm_calls.generate_budget_question(request.user_query)
+        diagnostic_questions = llm_calls.generate_diagnostic_questions(request.user_query)
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            # Map a unique identifier to each function call
-            future_to_task = {
-                executor.submit(llm_calls.generate_budget_question, request.user_query): "budget",
-                executor.submit(llm_calls.generate_diagnostic_questions, request.user_query): "diagnostic"
-            }
-
-            for future in as_completed(future_to_task):
-                task_name = future_to_task[future]
-                try:
-                    result = future.result()
-                    if task_name == "budget":
-                        budget_question_result = result
-                        print(f"User {user_id} | Step 3a | Generated budget question for conv_id: {conversation_id}")
-                    elif task_name == "diagnostic":
-                        diagnostic_questions_result = result
-                        print(f"User {user_id} | Step 3b | Generated {len(result)} diagnostic questions for conv_id: {conversation_id}")
-                except Exception as exc:
-                    print(f"ERROR: Task '{task_name}' generated an exception: {exc}")
-                    # Re-raise the exception to be caught by the outer try-except block
-                    raise exc
-
-        if not budget_question_result or not diagnostic_questions_result:
-            raise Exception("Failed to generate one or both sets of questions.")
-
-        # Assemble the final response payload
-        response_payload = {
-            "conversation_id": conversation_id,
-            "budget_question": budget_question_result,
-            "diagnostic_questions": diagnostic_questions_result
+        return {
+            # No conversation_id is returned here, as none is created yet.
+            # The client will hold the questions and pass them back to the /turn endpoint.
+            "budget_question": budget_question,
+            "diagnostic_questions": diagnostic_questions
         }
-        
-        # Log the successful start step to GCS
-        start_log_payload = {
-            "userId": user_id,
-            "userQuery": request.user_query,
-            "guardrailResult": guardrail_result,
-            "generatedQuestions": response_payload # Log the entire combined payload
-        }
-        background_tasks.add_task(log_step, conversation_id, "01_start", start_log_payload)
-        
-        return response_payload
 
     except Exception as e:
         print(f"ERROR in /start for user {user_id}: {e}")
-        failure_log = {"userId": user_id, "userQuery": request.user_query, "error": str(e)}
-        background_tasks.add_task(log_step, conversation_id, "01_start_failure", failure_log)
-        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred during the start process: {e}"
+            detail=f"An unexpected error occurred while generating questions: {e}"
         )
 
-@router.post(
-    "/fast-search",
-    response_model=FinalizeResponse,
+
+# ==============================================================================
+# Conversational Turn Endpoints
+# ==============================================================================
+
+@convo_router.post(
+    "/turn",
+    response_model=TurnCreationResponse,
     status_code=status.HTTP_202_ACCEPTED
 )
-async def fast_search_recommendation(
-    request: FinalizeRequest,
+async def process_conversation_turn(
+    request: TurnRequest,
     background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user)
 ):
     """
-    Accepts user's answers and starts the FAST recommendation generation as a
-    background job. This flow skips web scraping for a quicker, lower-cost result,
-    relying on LLM synthesis from search snippets alone. It returns immediately
-    with a 202 Accepted response.
+    Processes a single turn in a conversation.
+    - If `conversationId` is null, creates a new conversation and the first turn.
+    - If `conversationId` is provided, adds a new turn to the existing conversation.
+    
+    This endpoint starts a background job and returns immediately.
     """
     conv_id = request.conversation_id
-    print(f"Fast Search job accepted for user: {user_id}, conv_id: {conv_id}. Starting background task.")
+    
+    if conv_id:
+        # This is a follow-up turn. First, verify ownership and get turn count.
+        try:
+            # We fetch the snapshot to check ownership and get the turn count for the index.
+            # This is a read-before-write, which is acceptable here.
+            snapshot = get_conversation_snapshot(user_id, conv_id)
+            next_turn_index = len(snapshot.turns)
+            
+            # Create the new "processing" turn document in Firestore
+            turn_id = logging_service.create_subsequent_turn(
+                conversation_id=conv_id,
+                user_query=request.user_query,
+                next_turn_index=next_turn_index
+            )
+            print(f"Follow-up turn accepted for user: {user_id}, conv_id: {conv_id}. Starting background task.")
 
-    # The initial payload must contain all required fields for the history feature.
-    initial_history_payload = {
-        "userId": user_id,
-        "userQuery": request.user_query,
-        "title": request.user_query,
-        "isDeleted": False,
-    }
-    # 1. Create the initial document in Firestore to track the job's state.
-    create_history_document(conv_id, initial_history_payload)
+        except Exception as e:
+            # Catches HistoryNotFound, NotOwnerOfHistory, etc.
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Conversation not found or access denied: {e}")
+    
+    else:
+        # This is the first turn. Create the conversation and the turn document.
+        conv_id, turn_id = logging_service.create_conversation_and_first_turn(
+            user_id=user_id,
+            user_query=request.user_query
+        )
+        next_turn_index = 0
+        print(f"Initial turn accepted for user: {user_id}. New conv_id: {conv_id}. Starting background task.")
 
-    # 2. Schedule the new, faster, long-running task to execute in the background.
-    background_tasks.add_task(run_fast_search_flow, request, user_id)
+    # Schedule the universal background job
+    background_tasks.add_task(
+        process_turn_background_job,
+        conversation_id=conv_id,
+        turn_id=turn_id,
+        turn_index=next_turn_index,
+        user_id=user_id,
+        full_request=request
+    )
+    
+    return {"conversation_id": conv_id, "turn_id": turn_id, "status": "processing"}
 
-    # 3. Return immediately to the client.
-    return {"conversation_id": conv_id}
 
-# --- NEW ENDPOINT: Poll for job status ---
-@router.get(
-    "/status/{conversation_id}",
-    response_model=StatusResponse
+@convo_router.get(
+    "/turn_status/{turn_id}",
+    response_model=TurnStatusResponse
 )
-async def get_job_status(
-    conversation_id: str,
+async def get_turn_status(
+    turn_id: str,
+    # ADD THE ALIAS HERE
+    conversation_id: str = Query(..., alias="conversationId", description="The parent conversation ID for the turn."),
     user_id: str = Depends(get_current_user)
 ):
     """
-    Poll this endpoint to get the current status of a recommendation job.
-    """
-    try:
-        # We need a direct Firestore client instance here to read the status
-        firestore_client = firestore.Client()
-        doc_ref = firestore_client.collection("histories").document(conversation_id)
-        doc = doc_ref.get()
-
-        if not doc.exists:
-            raise HTTPException(status_code=404, detail="Conversation not found.")
-
-        # Ensure the user requesting status is the one who created the job
-        if doc.to_dict().get("userId") != user_id:
-             raise HTTPException(status_code=403, detail="Forbidden")
-
-        return {"status": doc.to_dict().get("status", "unknown")}
-
-    except HTTPException as http_exc:
-        raise http_exc # Re-raise FastAPI's own exceptions
-    except Exception as e:
-        print(f"ERROR fetching status for conv_id {conversation_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve job status.")
-
-
-# --- NEW ENDPOINT: Fetch the final results ---
-@router.get(
-    "/result/{conversation_id}",
-    response_model=ResultResponse
-)
-async def get_job_result(
-    conversation_id: str,
-    user_id: str = Depends(get_current_user)
-):
-    """
-    Fetch the final results of a completed recommendation job.
+    Poll this endpoint to get the current status of a specific turn's processing job.
     """
     try:
         firestore_client = firestore.Client()
-        doc_ref = firestore_client.collection("histories").document(conversation_id)
-        doc = doc_ref.get()
+        
+        # Verify ownership by checking the parent conversation document first.
+        history_ref = firestore_client.collection("histories").document(conversation_id)
+        history_doc = history_ref.get()
 
-        if not doc.exists:
-            raise HTTPException(status_code=404, detail="Conversation not found.")
+        if not history_doc.exists or history_doc.to_dict().get("userId") != user_id:
+             raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this conversation.")
 
-        data = doc.to_dict()
+        # Now fetch the specific turn document
+        turn_ref = history_ref.collection("turns").document(turn_id)
+        turn_doc = turn_ref.get()
 
-        # Ensure the user requesting the result is the one who created the job
-        if data.get("userId") != user_id:
-            raise HTTPException(status_code=403, detail="Forbidden")
+        if not turn_doc.exists:
+            raise HTTPException(status_code=404, detail="Turn not found.")
 
-        # Check if the job is actually complete
-        if data.get("status") != "complete":
-            raise HTTPException(status_code=422, detail=f"Job status is '{data.get('status')}'. Result is not ready.")
-
-        # --- MODIFICATION: Construct the simpler final result ---
-        # Construct and return the final result
-        return {
-            "recommendations": data.get("recommendations", ""),
-            "productNames": data.get("productNames", []),
+        turn_data = turn_doc.to_dict()
+        
+        response_payload = {
+            "status": turn_data.get("status", "unknown"),
+            "model_response": turn_data.get("modelResponse"), # Will be None if not complete
+            "product_names": turn_data.get("productNames"),   # Will be None or [] if not complete
+            "error": turn_data.get("error")                   # Will be None if not failed
         }
 
+        return response_payload
+
     except HTTPException as http_exc:
-        raise http_exc # Re-raise FastAPI's own exceptions
+        raise http_exc
     except Exception as e:
-        print(f"ERROR fetching result for conv_id {conversation_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve job result.")
-    
-@router.post(
-    "/chat/{conversation_id}",
-    response_model=FollowupResponse,
-    summary="Handle a follow-up chat message"
-)
-async def handle_followup_chat_message(
-    conversation_id: str,
-    request: FollowupRequest,
-    user_id: str = Depends(get_current_user)
-):
-    """
-    Handles a single, stateful follow-up message from the user for an existing
-    recommendation.
-
-    This endpoint orchestrates a "Read-Process-Write" cycle:
-    1.  Reads the entire conversation history from Firestore.
-    2.  Uses an LLM with a `web_search` tool to generate a contextual response.
-    3.  Writes the new turn (user query + model response) back to the history.
-    4.  Returns the final model response to the user.
-    """
-    try:
-        final_response = followup_service.handle_chat_turn(
-            conversation_id=conversation_id,
-            user_id=user_id,
-            new_user_query=request.user_query
-        )
-        return {"model_response": final_response}
-
-    except followup_service.ConversationNotFound as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except followup_service.NotOwnerOfConversation as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except Exception as e:
-        # Catch-all for any other unexpected errors in the service layer
-        print(f"ERROR: Unhandled exception in chat endpoint for conv_id {conversation_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred during the chat process: {str(e)}"
-        )
+        print(f"ERROR fetching status for turn_id {turn_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve job status.")

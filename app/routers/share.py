@@ -12,6 +12,7 @@ from app.schemas import (
     ShareCreateRequest,
     ShareCreateResponse,
     ShareDataResponse,
+    ConversationResponse
 )
 
 # Import the dependency for authentication
@@ -73,15 +74,13 @@ async def create_share_link_endpoint(
 
 @router.get(
     "/{share_id}",
-    response_model=ShareDataResponse,
+    response_model=ConversationResponse,
     summary="Get data for a shared recommendation"
 )
 async def get_shared_data_endpoint(share_id: str):
     """
-    Retrieves all the necessary data to render a shared recommendation page.
-
-    - This is a **public** endpoint and does not require authentication.
-    - It returns a 404 error if the link is invalid or has been disabled.
+    Retrieves all the necessary data to render a shared conversation page.
+    This is a public endpoint and does not require authentication.
     """
     print(f"Public request for shared data with ID: {share_id}")
     try:

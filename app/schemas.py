@@ -25,8 +25,44 @@ class StartRequest(BaseModel):
         populate_by_name=True,
     )
 
+# NEW: Universal request model for creating any turn (initial or followup)
+class TurnRequest(BaseModel):
+    """
+    Data model for the POST /api/conversations/turn endpoint.
+    Handles both the creation of a new conversation and adding turns to an existing one.
+    """
+    conversation_id: Optional[str] = Field(
+        None, alias="conversationId", description="The ID of the conversation. If null, a new conversation is created."
+    )
+    user_query: str = Field(
+        ..., alias="userQuery", description="The user's prompt for this specific turn."
+    )
+    user_answers: Optional[List[Union["PriceAnswer", "DiagnosticAnswer"]]] = Field(
+        None, alias="userAnswers", description="The user's answers from the initial questionnaire. Only provided for the first turn."
+    )
 
-# --- New Answer Models for FinalizeRequest ---
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+# MODIFIED: Renamed and repurposed for enriching a specific turn
+class EnrichTurnRequest(BaseModel):
+    """Data model for the /enrich endpoint request body."""
+    conversation_id: str = Field(
+        ..., alias="conversationId", description="The ID of the recommendation conversation."
+    )
+    turn_id: str = Field(
+        ..., alias="turnId", description="The specific turn ID within the conversation to which this enrichment belongs."
+    )
+    product_names: List[str] = Field(
+        ..., alias="productNames", description="A list of product names to be enriched with images and shopping links."
+    )
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 class AnswerOption(BaseModel):
     """Data model for a single selected option within a user's answer."""
@@ -112,45 +148,79 @@ class ShareCreateRequest(BaseModel):
         populate_by_name=True,
     )
 
-class FollowupRequest(BaseModel):
-    """Data model for the POST /api/recommendations/chat/{conversation_id} endpoint."""
-    user_query: str = Field(..., alias="userQuery", description="The user's follow-up message.")
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
 
 # --- Response Models ---
 
-# NEW MODEL for the asynchronous /finalize endpoint response
-class FinalizeResponse(BaseModel):
+# NEW: Immediate response after creating a turn.
+class TurnCreationResponse(BaseModel):
     """
-    Data model for the immediate, asynchronous response from the POST /finalize endpoint.
-    It acknowledges the request and provides the ID to poll for status.
+    Data model for the immediate response from POST /api/conversations/turn.
+    Acknowledges the request and provides IDs to poll for status.
     """
     conversation_id: str = Field(..., alias="conversationId")
+    turn_id: str = Field(..., alias="turnId")
+    status: str = Field(..., description="The initial status of the job (e.g., 'processing').")
+    
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+# NEW: Response for polling the status of a single turn.
+class TurnStatusResponse(BaseModel):
+    """
+    Data model for the GET /api/conversations/turn_status/{turnId} endpoint.
+    Provides the current state and final content of a specific turn's background job.
+    """
+    status: str = Field(..., description="The current status of the job (e.g., 'processing', 'complete', 'failed').")
+    
+    # These fields will be populated once the status is 'complete' or 'failed'.
+    model_response: Optional[str] = Field(
+        None, alias="modelResponse", description="If complete, the full Markdown response from the LLM."
+    )
+    product_names: Optional[List[str]] = Field(
+        None, alias="productNames", description="If complete, the list of recommended products."
+    )
+    error: Optional[str] = Field(
+        None, description="If the status is 'failed', this will contain the error message."
+    )
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         populate_by_name=True,
     )
 
-# NEW MODEL for the status polling endpoint
-class StatusResponse(BaseModel):
-    """
-    Data model for the GET /status/{conversation_id} endpoint, providing the
-    current state of the background job.
-    """
-    status: str = Field(..., description="The current status of the job (e.g., 'processing', 'complete', 'failed').")
 
+# NEW: The main data model for a single conversational turn.
+class Turn(BaseModel):
+    """Data model representing a single turn within a conversation."""
+    turn_id: str = Field(..., alias="turnId")
+    turn_index: int = Field(..., alias="turnIndex")
+    status: str
+    user_query: str = Field(..., alias="userQuery")
+    model_response: Optional[str] = Field(None, alias="modelResponse")
+    product_names: List[str] = Field(default=[], alias="productNames")
+    enriched_products: List["EnrichedProduct"] = Field(default=[], alias="enrichedProducts")
+    created_at: datetime = Field(..., alias="createdAt")
+    error: Optional[str] = None
+    
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
-# RENAMED from RecommendationsResponse to ResultResponse
-class ResultResponse(BaseModel):
-    """Data model for the GET /result/{conversation_id} endpoint response."""
-    recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
-    product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the Report.")
+# NEW: The master response object for fetching a full conversation.
+class ConversationResponse(BaseModel):
+    """
+    Data model for the response from GET /api/history/{conversationId}
+    and GET /api/share/{shareId}, containing the entire conversation.
+    """
+    conversation_id: str = Field(..., alias="conversationId")
+    user_id: str = Field(..., alias="userId")
+    title: str
+    created_at: datetime = Field(..., alias="createdAt")
+    updated_at: datetime = Field(..., alias="updatedAt")
+    turns: List[Turn]
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -195,7 +265,6 @@ class StartResponse(BaseModel):
     Data model for the /start endpoint response body, containing the full
     questionnaire split into budget and diagnostic sections.
     """
-    conversation_id: str = Field(..., alias="conversationId")
     budget_question: BudgetQuestion = Field(..., alias="budgetQuestion")
     diagnostic_questions: List[DiagnosticQuestion] = Field(..., alias="diagnosticQuestions")
 
@@ -203,11 +272,6 @@ class StartResponse(BaseModel):
         alias_generator=to_camel,
         populate_by_name=True,
     )
-
-class StopResponse(BaseModel):
-    """Data model for the /stop endpoint response body."""
-    status: str = Field(..., example="stopped")
-    message: str = Field(..., example="Your session has been terminated.")
 
 class RejectionResponse(BaseModel):
     """
@@ -254,21 +318,14 @@ class ShareCreateResponse(BaseModel):
         populate_by_name=True,
     )
 
-class ShareDataResponse(BaseModel):
+# MODIFIED: The response for a public share link is now the full conversation object.
+class ShareDataResponse(ConversationResponse):
     """
     Data model for the public GET /api/share/{shareId} endpoint.
-    Contains all the data needed to render a shared recommendation page,
-    including any associated deep research reports.
+    It contains all the data needed to render a shared conversation page.
+    This model inherits all fields from ConversationResponse.
     """
-    user_query: str = Field(..., alias="userQuery", description="The original user query that initiated the recommendation.")
-    recommendations: str = Field(..., description="The full recommendation report in Markdown format.")
-    product_names: List[str] = Field(..., alias="productNames", description="A list of extracted product names from the Report.")
-    enriched_products: List[EnrichedProduct] = Field(..., alias="enrichedProducts", description="The enriched data for the recommended products.")
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    pass # Inherits everything from ConversationResponse
 
 class HistoryUpdateRequest(BaseModel):
     """Data model for the PATCH /api/history/{conversationId} endpoint body."""
@@ -295,15 +352,6 @@ class HistoryListResponse(BaseModel):
     """Data model for the GET /api/history endpoint response."""
     history: List[HistorySummaryItem]
     next_cursor: Optional[str] = Field(None, alias="nextCursor", description="The cursor to use for fetching the next page of results. Null if this is the last page.")
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-class FollowupResponse(BaseModel):
-    """Data model for the response from the follow-up chat endpoint."""
-    model_response: str = Field(..., alias="modelResponse", description="The final, user-facing text response from the model.")
 
     model_config = ConfigDict(
         alias_generator=to_camel,

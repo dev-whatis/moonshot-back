@@ -12,7 +12,8 @@ from app.services import history_service
 from app.schemas import (
     HistoryListResponse,
     HistoryUpdateRequest,
-    ShareDataResponse
+    ShareDataResponse,
+    ConversationResponse
 )
 
 # Import the dependency for authentication
@@ -62,10 +63,9 @@ async def get_history_list(
             detail="An unexpected error occurred while fetching conversation history."
         )
 
-
 @router.get(
     "/{conversation_id}",
-    response_model=ShareDataResponse,
+    response_model=ConversationResponse,
     summary="Get a full conversation snapshot"
 )
 async def get_history_detail(
@@ -74,10 +74,9 @@ async def get_history_detail(
 ):
     """
     Retrieves the complete data snapshot for a single conversation, including
-    the main report, enriched products, and any associated deep research.
+    all of its turns, metadata, and any enriched data.
     """
     try:
-        # CORRECTED: Call the sync function directly.
         snapshot = history_service.get_conversation_snapshot(
             user_id=user_id,
             conversation_id=conversation_id
