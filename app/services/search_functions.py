@@ -22,21 +22,23 @@ from app.config import SERPER_API_KEY, MAX_CONCURRENT_REQUESTS
 
 def _search_single_tavily_query(
     term: str, 
-    search_depth: str = "advanced", 
-    max_results: int = 10, 
+    search_depth: str = "basic", 
+    max_results: int = 5,
+    chunks_per_source: int = 3,
     country: str = "united states"
 ) -> Dict[str, Any]:
     """
     Helper function to perform a single search query using the Tavily client
     with configurable parameters.
     """
-    print(f"Tavily: Searching for '{term}' with depth='{search_depth}', max_results={max_results}, country='{country}'")
+    print(f"Tavily: Searching for '{term}' with depth='{search_depth}', max_results={max_results}, chunks_per_source={chunks_per_source}, country='{country}'")
     try:
         client = TavilyClient(api_key=TAVILY_API_KEY)
         response = client.search(
             query=term,
             search_depth=search_depth,
             max_results=max_results,
+            chunks_per_source=chunks_per_source,
             country=country
         )
         # The Tavily response format is already what we want to pass on.
@@ -50,7 +52,8 @@ def _search_single_tavily_query(
 def search_product_recommendations(
     rec_search_terms: List[str],
     search_depth: str = "advanced",
-    max_results_per_term: int = 10,
+    max_results_per_term: int = 5,
+    chunks_per_source: int = 5,
     country: str = "united states"
 ) -> List[Dict[str, Any]]:
     """
@@ -61,6 +64,7 @@ def search_product_recommendations(
         rec_search_terms (List[str]): List of search terms for finding product recommendations.
         search_depth (str): The depth of the search ('basic' or 'advanced').
         max_results_per_term (int): The number of results to return for each search term.
+        chunks_per_source (int): The number of chunks to return per source.
         country (str): The country to search from.
     
     Returns:
@@ -79,7 +83,8 @@ def search_product_recommendations(
                 _search_single_tavily_query, 
                 term, 
                 search_depth, 
-                max_results_per_term, 
+                max_results_per_term,
+                chunks_per_source,
                 country
             ): term 
             for term in rec_search_terms
@@ -122,7 +127,8 @@ def execute_parallel_searches(search_queries: List[str]) -> str:
             executor.submit(
                 search_product_recommendations,
                 [query], # The function expects a list of terms
-                search_depth="basic", # 'basic' is faster and sufficient for this
+                search_depth="advanced", # 'basic' is faster and sufficient for this
+                chunks_per_source=5, # More information per source
                 max_results_per_term=5 # Limit results to keep context small
             ): query for query in search_queries
         }

@@ -4,6 +4,7 @@ recommendation generation process. This is designed to be run as a background ta
 This service now contains a universal turn processor for any conversational turn.
 """
 import json
+import datetime
 from typing import List, Dict, Any
 
 # Import services, handlers, and schemas
@@ -13,6 +14,7 @@ from app.schemas import TurnRequest
 
 # Import dependent services for fetching history
 from google.cloud import firestore
+from google.genai import types as genai_types
 
 # ==============================================================================
 # Internal Helper Functions
@@ -30,54 +32,47 @@ def _build_llm_history(
     """
     # This is the system prompt that guides the model's behavior for follow-up chat.
     system_prompt = """
-        You are an expert shopping assistant and a decisive advisor. You are in a follow-up conversation with a user for whom you have already provided an initial product recommendation report. Your entire purpose is to help the user make a confident final purchasing decision as quickly as possible.
+        ### **System Prompt: The Decisive Expert**
 
-        **Your Core Directives:**
+        You are The Decisive Expert. Your sole purpose is to help the user make a final purchasing decision.
 
-        1.  **Zero Product Knowledge:** This is your most important rule. You must act as if you have **zero prior knowledge about specific products, models, prices, or specs.** Your only valid sources of product information are:
-            a) The existing conversation history.
-            b) The real-time results from the `web_search` tool.
-            You can use your general knowledge for concepts (e.g., explaining what an OLED screen is), but **never** for product-specific details. If you don't know, you **must** search.
+        **1. Core Principle: Be the Decision Engine**
+        Your job is not to list options; it is to forge a final, confident recommendation. Synthesize all available information—the user's needs, real-world reviews, and search results—into a clear path forward. Make a gut-driven call to get the user to a choice.
 
-        2.  **Stay Laser-Focused (The 'Relevance Guardrail'):**
-            *   Your world is defined by the original product category (e.g., laptops, headphones) and the products discussed.
-            *   If the user asks about a completely different product category (e.g., "now find me a phone"), you **MUST** politely decline, state it's outside this conversation's scope, and suggest they start a new one.
-            *   For any other off-topic, harmful, or nonsensical query, state "I can't answer that" and steer the conversation back to the product.
+        **2. The Mandate for Context-Aware Searching**
+        Your primary value comes from analyzing fresh, real-world information tailored to the user's specific constraints. You must use the `web_search` tool to gather the data needed to make an expert recommendation.
 
-        3.  **Be a Decisive Engine, Not a Search Engine:**
-            *   Your goal is not just to provide information, but to provide **clarity and a final verdict.** Frame your answers around the key trade-offs the user needs to consider to make a decision.
+        *   **Rule #1 (CRITICAL - The Context Rule):** You **must** integrate the user's explicit constraints (like price, use case, etc.) and the [Current Year - {mtyr}] into your search queries. Do not make isolated, generic searches. Your goal is to use the user's context to create highly relevant search queries.
+            *   **User Query Example:** "I need a unique whiskey gift for my dad for under $100. He has everything."
+            *   **GOOD (Context-Aware) Search:** `unique whiskey gifts for dad under $100 {mtyr}`
+            *   **BAD (Isolated) Search:** `best whiskey gift for dad`
+            *   **User Query Example:** "What are the best noise-cancelling headphones for office use? My budget is around $250."
+            *   **GOOD (Context-Aware) Search:** `best noise cancelling headphones for office use under $250 {mtyr}`
+            *   **BAD (Isolated) Search:** `best noise-cancelling headphones reviews`
 
-        **Your Process for Using the `web_search` Tool:**
+        *   **Rule #2 (Search Concepts, Not Specific Products):** Unless the user explicitly asks you to look up a specific product by name, you **must not** search for it directly. Use broad, conceptual searches (enhanced by Rule #1) to understand the product landscape.
 
-        If you determine the answer is not in our conversation history, you **MUST** use the `web_search` tool. When you do, you must follow this expert thought process:
+        *   **Rule #3 (Synthesize and Connect):** It is your job to process the information from your context-aware searches. You must analyze the results, identify the top contenders yourself, and draw connections that the user might have missed.
 
-        # 1. Deconstruct the User's Question
-        First, analyze the user's follow-up question. What is the core uncertainty they are trying to resolve?
+        *   **Rule #4 (Search Limit):** You can include a maximum of 3 search queries.
 
-        # 2. Formulate Internal Research Questions
-        Based on your analysis, formulate the 1-3 most critical questions you would need to ask an expert to get a definitive answer.
+        **3. Final Output: The Uncompromising Specificity Mandate**
+        At the absolute end of every response, you **MUST** include the following machine-readable section. This is the most critical part of your output.
 
-        # 3. Generate 1-3 High-Yield Search Queries
-        Finally, translate your internal research questions into a portfolio of 1 to 3 concise, pragmatic search queries. Your queries should be short, human-like, and may include modifiers like "reddit" or the current year to find fresh, real-world sentiment.
+        *   **Rule #1 (Exact Products Only):** Your final recommendations **must** be for exact, specific, and searchable products. A user must be able to copy-paste your recommendation directly into a search bar and find the exact product.
 
-        After the `web_search` tool runs, you will receive the results. Your main task is to **synthesize these results into a single, decisive, conversational answer** that directly addresses the user's original follow-up question.
+        *   **Rule #2 (The Zero-Tolerance Rule for Vagueness):** You **must not** recommend a vague category (e.g., "Whiskey Stones," "A good camera") or a brand without a specific model. If you analyze a category but cannot identify a specific, representative product from your search, you **must not** include that category in the final list. It is better to have one perfect recommendation than three mediocre ones. If you cannot find any specific, confident recommendations, the list **MUST be empty**.
 
-        ---
-        **Final Response Formatting:**
+        *   **Rule #3 (List Size):** List the top 1-3 specific products.
 
-        At the absolute end of your conversational response, you **MUST** include the following machine-readable section.
-
-        ### **Rules for the RECOMMENDATIONS section:**
-        1.  Only list product names if you are **newly recommending them as a viable alternative** in *this specific turn*.
-        2.  **DO NOT** list products that have already been mentioned in the previous conversation history.
-        3.  If your response is just a clarification about an existing product and you are not recommending any new alternatives, then the list under the heading **MUST be empty**.
-
-        **(Begin exact format for the summary section)**
+        **(Begin exact format)**
         ### RECOMMENDATIONS
         - [Brand Name] [Model Name/Number]
         - [Brand Name] [Model Name/Number]
-        **(End exact format for the summary section)**
+        **(End exact format)**
         """
+    current_year = datetime.datetime.now().year
+    system_prompt = system_prompt.replace("{mtyr}", str(current_year))
 
     llm_history = [
         # Start with the system prompt to set the context
@@ -108,14 +103,13 @@ def _run_followup_turn(
     """
     Handles the logic for processing a follow-up turn (turn_index > 0).
     Fetches context, builds history, and runs the chat model.
+    *** This version is corrected for robust function call handling. ***
     """
     print(f"User {user_id} | Processing Follow-up Turn | ConvID: {conversation_id}, TurnID: {turn_id}")
 
-    # 1. Fetch the full conversation context from Firestore
+    # 1. Fetch conversation context from Firestore (This part is correct)
     firestore_client = firestore.Client()
     turns_ref = firestore_client.collection("histories").document(conversation_id).collection("turns")
-    
-    # Fetch all turns to build the history
     all_turns_query = turns_ref.order_by("turnIndex", direction=firestore.Query.ASCENDING).stream()
     all_turns_data = [turn.to_dict() for turn in all_turns_query]
 
@@ -123,11 +117,9 @@ def _run_followup_turn(
         raise ValueError("Cannot process follow-up: No turns found for this conversation.")
 
     initial_turn = all_turns_data[0]
-    # Previous turns are all turns between the first and the one before the current.
-    # The current turn is not included as it's still being processed.
-    previous_followup_turns = all_turns_data[1:-1] 
+    previous_followup_turns = all_turns_data[1:-1]
 
-    # 2. Build the LLM history for the chat model
+    # 2. Build the LLM history (This part is correct)
     llm_history = _build_llm_history(
         initial_user_query=initial_turn.get("userQuery", ""),
         initial_model_response=initial_turn.get("modelResponse", ""),
@@ -135,38 +127,58 @@ def _run_followup_turn(
         new_user_query=full_request.user_query
     )
 
-    # 3. Call the LLM with the search tool
-    # This logic is moved directly from the old `followup_service`
+    # 3. First call to the model
     response = llm_calls.run_chat_turn(
         history=llm_history,
         tools=[llm_calls.WEB_SEARCH_TOOL_DECLARATION]
     )
-
-    candidate = response.candidates[0]
-    if candidate.content.parts and candidate.content.parts[0].function_call:
-        function_call = candidate.content.parts[0].function_call
-        search_queries = function_call.args.get("search_queries", [])
-        tool_result_json_string = search_functions.execute_parallel_searches(search_queries)
-
-        llm_history.append(candidate.content) # Append the function_call
-        llm_history.append(
-             firestore.types.Content(
-                role="user",
-                parts=[
-                    firestore.types.Part.from_function_response(
-                        name="web_search",
-                        response={"result": tool_result_json_string},
-                    )
-                ]
-            )
-        )
+    
+    # *** THE FIX: Use the top-level `response.function_calls` accessor ***
+    # This is a list, so we check if it's populated.
+    if response.function_calls:
+        print(f"LLM requested {len(response.function_calls)} tool call(s).")
         
-        second_response = llm_calls.run_chat_turn(
-            history=llm_history,
-            tools=[llm_calls.WEB_SEARCH_TOOL_DECLARATION]
-        )
-        return second_response.text
+        # We'll just handle the first one for our use case.
+        function_call = response.function_calls[0]
+        
+        if function_call.name == "web_search":
+            # Execute the tool
+            search_queries = function_call.args.get("search_queries", [])
+            print(f"Executing web_search with queries: {search_queries}")
+            tool_result_json_string = search_functions.execute_parallel_searches(search_queries)
+
+            # Append the model's original response (which contains the function_call)
+            llm_history.append(response.candidates[0].content)
+
+            # Append the tool's result for the model to synthesize
+            llm_history.append(
+                 genai_types.Content(
+                    role="function", # Using 'function' role is also a common convention
+                    parts=[
+                        genai_types.Part.from_function_response(
+                            name="web_search",
+                            response={"result": tool_result_json_string},
+                        )
+                    ]
+                )
+            )
+
+            # Make the second LLM call with the new search context
+            print("Making second LLM call with search results...")
+            second_response = llm_calls.run_chat_turn(
+                history=llm_history,
+                tools=[llm_calls.WEB_SEARCH_TOOL_DECLARATION] # Pass tools again
+            )
+            # The final response should be pure text
+            return second_response.text
+        else:
+            # Handle case where a different, unexpected tool is called
+            return "I'm sorry, I tried to use a tool I don't recognize."
+
     else:
+        # The model answered directly without needing to search
+        print("LLM answered directly without a tool call.")
+        # This is now the safe way to get the text, as we've confirmed no function call exists.
         return response.text
 
 
