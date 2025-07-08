@@ -153,16 +153,14 @@ def synthesize_fast_recommendations(
         print(f"ERROR: Fast Search recommendation synthesis failed: {e}")
         raise
 
-# --- NEW CONSTANTS AND FUNCTIONS for the Follow-up Chat Feature ---
+# ==============================================================================
+
 WEB_SEARCH_TOOL_DECLARATION = types.Tool(
     function_declarations=[
         types.FunctionDeclaration(
             name="web_search",
             description=(
-                "Performs a web search to find up-to-date information when the answer "
-                "is not in the conversation history. Use this to find new product alternatives, "
-                "verify specific, time-sensitive facts (like specs or availability of a latest model), "
-                "or answer questions about technology concepts."
+                "Performs web searches to find up-to-date information on products, services, or topics."
             ),
             parameters=types.Schema(
                 type=types.Type.OBJECT,
@@ -170,7 +168,7 @@ WEB_SEARCH_TOOL_DECLARATION = types.Tool(
                     "search_queries": types.Schema(
                         type=types.Type.ARRAY,
                         items=types.Schema(type=types.Type.STRING),
-                        description="A list of 1 to 3 concise, targeted search queries."
+                        description="A list of targeted search queries."
                     )
                 },
                 required=["search_queries"]
