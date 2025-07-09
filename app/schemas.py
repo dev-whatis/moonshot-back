@@ -467,7 +467,7 @@ FAST_SEARCH_QUERIES_SCHEMA = {
   "properties": {
     "searchQueries": {
       "type": "array",
-      "description": "A list of 4-6 concise search queries designed to gather evidence from snippets for a rapid recommendation.",
+      "description": "A list of 3-4 concise search queries",
       "items": {
         "type": "string",
         "description": "A single, human-like search query string"

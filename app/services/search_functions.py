@@ -57,7 +57,7 @@ def search_product_recommendations(
     country: str = "united states"
 ) -> List[Dict[str, Any]]:
     """
-    Step 4.5: Search for product recommendations using parallel Tavily API calls
+    Search for product recommendations using parallel Tavily API calls
     with configurable parameters.
     
     Args:

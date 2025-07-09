@@ -100,7 +100,6 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
 def generate_fast_search_queries(
     user_query: str,
     user_answers: list[dict],
-    recon_search_results: list[dict]
 ) -> dict:
     """
     Step FS1: Generates a portfolio of 4-6 concise, high-yield search queries
@@ -110,7 +109,6 @@ def generate_fast_search_queries(
     prompt = STEP_FS1_FAST_SEARCH_QUERY_GENERATOR_PROMPT.format(
         user_query=user_query,
         user_answers_json=json.dumps(user_answers, indent=2),
-        recon_search_results_json=json.dumps(recon_search_results, indent=2),
         current_year=current_year
     )
     # This task is complex enough to benefit from thinking mode.
@@ -120,7 +118,6 @@ def generate_fast_search_queries(
 def synthesize_fast_recommendations(
     user_query: str,
     user_answers: list[dict],
-    recon_search_results: list[dict],
     fast_search_results: list[dict]
 ) -> str:
     """
@@ -132,7 +129,6 @@ def synthesize_fast_recommendations(
         prompt = STEP_FS2_FAST_SEARCH_SYNTHESIZER_PROMPT.format(
             user_query=user_query,
             user_answers_json=json.dumps(user_answers, indent=2),
-            recon_search_results_json=json.dumps(recon_search_results, indent=2),
             fast_search_results_json=json.dumps(fast_search_results, indent=2),
         )
 

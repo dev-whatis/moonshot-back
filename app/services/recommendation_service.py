@@ -196,15 +196,11 @@ def _run_initial_turn(
     
     user_answers_dict = [answer.model_dump(by_alias=True) for answer in full_request.user_answers]
     user_query = full_request.user_query
-
-    # Step 1: Reconnaissance Search
-    recon_search_results = search_functions.search_product_recommendations([user_query])
     
     # Step 2: Generate Fast Search Queries
     fast_search_strategy = llm_calls.generate_fast_search_queries(
         user_query=user_query,
         user_answers=user_answers_dict,
-        recon_search_results=recon_search_results
     )
     fast_search_queries = fast_search_strategy.get("searchQueries", [])
 
@@ -215,7 +211,6 @@ def _run_initial_turn(
     final_recommendations = llm_calls.synthesize_fast_recommendations(
         user_query=user_query,
         user_answers=user_answers_dict,
-        recon_search_results=recon_search_results,
         fast_search_results=fast_search_results
     )
     return final_recommendations
