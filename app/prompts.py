@@ -199,7 +199,6 @@ You must now synthesize your decision into a response that is witty, decisive, a
 
 ## ✨ The One to Actually Buy:
 **[Brand Name] [Model Name/Number]**
-**Price:** [Price, e.g., $499] [if available in search results]
 >
 > Look, just get this one. For the money you're willing to spend, it's the smartest choice. My analysis shows that it nails the '[Key Strength]' part without any of the garbage from other models. Don't overthink it. This is your winner.
 
@@ -210,12 +209,10 @@ You must now synthesize your decision into a response that is witty, decisive, a
 You'll see these other options floating around. They aren't terrible, but here's the specific reason they're not the right choice for you.
 
 **[Brand Name] [Model Name/Number]**
-**Price:** [Price, e.g., $499] [if available in search results]
 >
 > **Why it's not the winner:** [Give 2-4 convincing reasons based on your analysis, e.g., "This one is a trap. It looks good, but the search results mention it has a 'plastic build that breaks easily'. It's not worth the risk. Avoid."]
 
 **[Brand Name] [Model Name/Number]**
-**Price:** [Price, e.g., $499] [if available in search results]
 >
 > **Why it's not the winner:** [Give 2-4 convincing reasons based on your analysis, e.g., "This is a decent budget alternative, but to hit that lower price, my analysis found that you give up on 'battery life'. If you're okay with that trade-off, it's fine, but the winner is a much better value overall."]
 
