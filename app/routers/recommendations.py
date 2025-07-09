@@ -5,6 +5,7 @@ This version uses a unified, turn-based conversational model.
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from typing import Optional
+import asyncio
 
 # Import services and handlers
 from app.services import llm_calls, logging_service
@@ -82,9 +83,24 @@ async def start_recommendation_questionnaire(
     print(f"User {user_id} | PASSED | Guardrail check passed. Generating questions.")
     
     try:
-        # Generate budget and diagnostic questions (can be parallelized if needed)
-        budget_question = llm_calls.generate_budget_question(request.user_query)
-        diagnostic_questions = llm_calls.generate_diagnostic_questions(request.user_query)
+        # The llm_calls functions are synchronous (blocking).
+        # We use asyncio.to_thread to run them in a separate thread without
+        # blocking the main FastAPI event loop.
+        budget_task = asyncio.to_thread(
+            llm_calls.generate_budget_question, request.user_query
+        )
+        diagnostics_task = asyncio.to_thread(
+            llm_calls.generate_diagnostic_questions, request.user_query
+        )
+
+        # asyncio.gather runs both tasks concurrently and waits for them to complete.
+        # The results will be returned in the same order.
+        print(f"User {user_id} | Generating budget and diagnostic questions in parallel...")
+        budget_question, diagnostic_questions = await asyncio.gather(
+            budget_task,
+            diagnostics_task
+        )
+        print(f"User {user_id} | Both questions generated.")
 
         return {
             # No conversation_id is returned here, as none is created yet.
