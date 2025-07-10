@@ -17,6 +17,7 @@ from app.routers import enrich
 from app.routers import share
 from app.routers import history
 from app.routers import paths
+from app.routers import quick_decisions
 from app.middleware.auth import initialize_firebase
 from app.config import AUTH_ENABLED
 
@@ -89,6 +90,7 @@ app.include_router(recommendations.router)    # Handles ongoing conversations (e
 app.include_router(enrich.router)             # Handles product enrichment
 app.include_router(share.router)              # Handles sharing functionality
 app.include_router(history.router)            # Handles conversation history
+app.include_router(quick_decisions.router)    # Handles quick decision-making
 
 
 # ==============================================================================

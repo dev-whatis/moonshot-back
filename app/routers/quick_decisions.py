@@ -1,18 +1,21 @@
 """
-(recommendations.py) Defines the API routes for an ongoing product recommendation conversation.
-This router handles the creation and polling of individual conversational turns.
+(quick_decisions.py) Defines API routes for the Quick Decision conversational flow.
+This router handles creating and polling conversational turns for simple, agentic chat.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query, Request
+from typing import Union
 
-# Import services and handlers
+# Import the service function for the new background job
+from app.services.quick_decision_service import process_quick_decision_turn_background_job
+from app.services import location_service
+
+# Import shared services and schemas
 from app.services import logging_service
-from app.services.recommendation_service import process_turn_background_job
 from app.services.history_service import get_conversation_snapshot # For ownership check
-
-# Import the Pydantic schemas relevant to conversational turns
 from app.schemas import (
-    TurnRequest,
+    InitialQuickDecisionTurnRequest,
+    FollowupQuickDecisionTurnRequest,
     TurnCreationResponse,
     TurnStatusResponse,
 )
@@ -27,10 +30,9 @@ from google.cloud import firestore
 # Router Setup
 # ==============================================================================
 
-# This single router now handles all conversation-related endpoints.
 router = APIRouter(
-    prefix="/api/conversations",
-    tags=["Conversations"]
+    prefix="/api/quick-decisions",
+    tags=["Quick Decisions"]
 )
 
 # ==============================================================================
@@ -41,62 +43,64 @@ router = APIRouter(
     "/turn",
     response_model=TurnCreationResponse,
     status_code=status.HTTP_202_ACCEPTED,
-    summary="Process a conversational turn"
+    summary="Process a quick decision conversational turn"
 )
-async def process_conversation_turn(
-    request: TurnRequest,
+async def process_quick_decision_turn(
+    request: Union[InitialQuickDecisionTurnRequest, FollowupQuickDecisionTurnRequest],
     background_tasks: BackgroundTasks,
+    fastapi_request: Request,
     user_id: str = Depends(get_current_user)
 ):
     """
-    Processes a single turn in a conversation.
+    Processes a single turn in a "Quick Decision" conversation. This endpoint
+    accepts two different request bodies:
+    - One for creating a new conversation (initial turn).
+    - One for adding a turn to an existing conversation (follow-up turn).
 
-    - If `conversationId` is null, it creates a new conversation and its first turn.
-      This happens after the user answers the questionnaire from the `/paths/start` endpoint.
-    - If `conversationId` is provided, it adds a new turn to the existing conversation for follow-up questions.
-
-    This endpoint immediately returns a 202 Accepted response and triggers a
-    long-running background job to generate the recommendation or answer.
+    It immediately returns a 202 Accepted response and triggers a
+    long-running background job to generate the agent's response.
     """
-    conv_id = request.conversation_id
+    location_context = None
 
-    if conv_id:
-        # This is a follow-up turn. First, verify ownership and get the turn count.
+    # Case 1: This is a follow-up turn for an existing conversation.
+    if isinstance(request, FollowupQuickDecisionTurnRequest):
+        conv_id = request.conversation_id
         try:
-            # We fetch a snapshot to check ownership and get the current turn count for the index.
             snapshot = get_conversation_snapshot(user_id, conv_id)
             next_turn_index = len(snapshot.turns)
-
-            # Create the new "processing" turn document in Firestore
             turn_id = logging_service.create_subsequent_turn(
                 conversation_id=conv_id,
                 user_query=request.user_query,
                 next_turn_index=next_turn_index
             )
-            print(f"Follow-up turn accepted for user: {user_id}, conv_id: {conv_id}. Starting background task.")
-
+            print(f"Follow-up quick decision turn accepted for user: {user_id}, conv_id: {conv_id}.")
         except Exception as e:
-            # This will catch HistoryNotFound, NotOwnerOfHistory, etc.
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Conversation not found or access denied: {e}")
 
+    # Case 2: This is the first turn, creating a new conversation.
     else:
-        # This is the first turn. Create the conversation and the turn document.
+        next_turn_index = 0
+        # Fetch location ONLY on the first turn if requested.
+        if request.need_location:
+            print(f"Location is needed for user {user_id}. Fetching from IP.")
+            location_context = await location_service.get_location_from_request(fastapi_request)
+        
         conv_id, turn_id = logging_service.create_conversation_and_first_turn(
             user_id=user_id,
             user_query=request.user_query,
-            conversation_type="PRODUCT_DISCOVERY"
+            conversation_type="QUICK_DECISION" 
         )
-        next_turn_index = 0
-        print(f"Initial turn accepted for user: {user_id}. New conv_id: {conv_id}. Starting background task.")
+        print(f"Initial quick decision turn accepted for user: {user_id}. New conv_id: {conv_id}.")
 
-    # Schedule the universal background job to handle the actual processing
+    # Schedule the universal background job, passing the appropriate context.
     background_tasks.add_task(
-        process_turn_background_job,
+        process_quick_decision_turn_background_job,
         conversation_id=conv_id,
         turn_id=turn_id,
         turn_index=next_turn_index,
         user_id=user_id,
-        full_request=request
+        full_request=request,
+        location_context=location_context
     )
 
     return {"conversation_id": conv_id, "turn_id": turn_id, "status": "processing"}
@@ -105,31 +109,31 @@ async def process_conversation_turn(
 @router.get(
     "/turn_status/{turn_id}",
     response_model=TurnStatusResponse,
-    summary="Get the status of a specific turn"
+    summary="Get the status of a specific quick decision turn"
 )
-async def get_turn_status(
+async def get_quick_decision_turn_status(
     turn_id: str,
     conversation_id: str = Query(..., alias="conversationId", description="The parent conversation ID for the turn."),
     user_id: str = Depends(get_current_user)
 ):
     """
-    Poll this endpoint to get the current status of a specific turn's processing job.
+    Poll this endpoint to get the status of a quick decision turn's processing job.
 
-    Once the status is 'complete', the response will include the 'modelResponse'
-    and 'productNames'. If the status is 'failed', it will include an 'error' message.
+    Once the status is 'complete', the response will include the 'modelResponse'.
+    This flow will not populate 'productNames'.
     """
     try:
         firestore_client = firestore.Client()
 
         # Verify ownership by checking the parent conversation document first.
-        # This is a critical security check.
+        # This is a critical security check and is identical to the other flow.
         history_ref = firestore_client.collection("histories").document(conversation_id)
         history_doc = history_ref.get()
 
         if not history_doc.exists or history_doc.to_dict().get("userId") != user_id:
              raise HTTPException(status_code=403, detail="Forbidden: You do not have access to this conversation.")
 
-        # If ownership is verified, fetch the specific turn document
+        # If ownership is verified, fetch the specific turn document.
         turn_ref = history_ref.collection("turns").document(turn_id)
         turn_doc = turn_ref.get()
 
@@ -138,11 +142,13 @@ async def get_turn_status(
 
         turn_data = turn_doc.to_dict()
 
+        # The response structure is identical, so we can reuse the same model.
+        # 'product_names' will simply be null/empty, which is expected.
         response_payload = {
             "status": turn_data.get("status", "unknown"),
-            "model_response": turn_data.get("modelResponse"), # Will be None if not complete
-            "product_names": turn_data.get("productNames"),   # Will be None or [] if not complete
-            "error": turn_data.get("error")                   # Will be None if not failed
+            "model_response": turn_data.get("modelResponse"),
+            "product_names": turn_data.get("productNames"),
+            "error": turn_data.get("error")
         }
 
         return response_payload
@@ -150,5 +156,5 @@ async def get_turn_status(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        print(f"ERROR fetching status for turn_id {turn_id}: {e}")
+        print(f"ERROR fetching status for quick decision turn_id {turn_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve job status.")

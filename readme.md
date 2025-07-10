@@ -4,10 +4,13 @@ app/main.py
 app/prompts.py
 app/schemas.py
 app/middleware/auth.py
+
 app/routers/enrich.py
 app/routers/history.py
+app/routers/paths.py
 app/routers/recommendations.py
 app/routers/share.py
+
 app/services/enrichment_service.py
 app/services/history_service.py
 app/services/llm_calls.py

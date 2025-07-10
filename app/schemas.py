@@ -107,6 +107,65 @@ class DiagnosticAnswer(BaseModel):
         populate_by_name=True,
     )
 
+class QuickAnswerOption(BaseModel):
+    """Data model for a single selected option in a quick decision answer."""
+    text: str = Field(..., description="The concise label for the option.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class QuickDecisionAnswer(BaseModel):
+    """
+    Data model for the user's answer to a single quick decision question.
+    """
+    question_type: Literal["single", "multi"] = Field(..., alias="questionType")
+    question: str = Field(..., description="The exact question text that was asked.")
+    user_answers: List[QuickAnswerOption] = Field(
+        ..., alias="userAnswers", description="A list of the option(s) the user selected."
+    )
+    
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class InitialQuickDecisionTurnRequest(BaseModel):
+    """
+    Data model for creating the FIRST turn of a Quick Decision conversation.
+    """
+    user_query: str = Field(
+        ..., alias="userQuery", description="The user's initial prompt."
+    )
+    need_location: bool = Field(
+        ..., alias="needLocation", description="Flag indicating if location context is relevant, from /paths/start."
+    )
+    user_answers: Optional[List[QuickDecisionAnswer]] = Field(
+        None, alias="userAnswers", description="Optional answers from the initial questionnaire."
+    )
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class FollowupQuickDecisionTurnRequest(BaseModel):
+    """
+    Data model for adding a SUBSEQUENT turn to an existing Quick Decision conversation.
+    """
+    conversation_id: str = Field(
+        ..., alias="conversationId", description="The ID of the existing conversation. This is required."
+    )
+    user_query: str = Field(
+        ..., alias="userQuery", description="The user's follow-up prompt."
+    )
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
 # --- Updated FinalizeRequest to use the new answer models ---
 class FinalizeRequest(BaseModel):
     """Data model for the /finalize endpoint request body."""

@@ -116,7 +116,8 @@ def save_rejected_query(rejection_data: dict):
 def _create_conversation_and_first_turn_transaction(
     transaction: firestore.Transaction,
     user_id: str,
-    user_query: str
+    user_query: str,
+    conversation_type: str
 ) -> Tuple[str, str]:
     """
     Executes the creation of a new conversation and its first turn within a transaction.
@@ -132,7 +133,8 @@ def _create_conversation_and_first_turn_transaction(
         "title": user_query,  # Default title is the first query
         "createdAt": firestore.SERVER_TIMESTAMP,
         "updatedAt": firestore.SERVER_TIMESTAMP,
-        "isDeleted": False
+        "isDeleted": False,
+        "conversationType": conversation_type
     }
     transaction.set(history_ref, history_data)
     
@@ -151,7 +153,11 @@ def _create_conversation_and_first_turn_transaction(
     return conversation_id, turn_id
 
 
-def create_conversation_and_first_turn(user_id: str, user_query: str) -> Tuple[str, str]:
+def create_conversation_and_first_turn(
+    user_id: str,
+    user_query: str,
+    conversation_type: str
+) -> Tuple[str, str]:
     """
     Creates a new conversation with its first turn atomically.
 
@@ -162,8 +168,10 @@ def create_conversation_and_first_turn(user_id: str, user_query: str) -> Tuple[s
         raise Exception("Firestore client is not initialized. Cannot create conversation.")
     
     transaction = firestore_client.transaction()
-    conv_id, turn_id = _create_conversation_and_first_turn_transaction(transaction, user_id, user_query)
-    print(f"Successfully CREATED new conversation '{conv_id}' and first turn '{turn_id}'.")
+    conv_id, turn_id = _create_conversation_and_first_turn_transaction(
+        transaction, user_id, user_query, conversation_type
+    )
+    print(f"Successfully CREATED new conversation '{conv_id}' ({conversation_type}) and first turn '{turn_id}'.")
     return conv_id, turn_id
 
 

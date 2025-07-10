@@ -35,6 +35,9 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "your_tavily_api_key_here")
 # This is a secret and should be set in your .env file
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "your_serper_api_key_here") 
 
+# --- IP Geolocation API Configuration ---
+IPGEOLOCATION_API_KEY = os.getenv("IPGEOLOCATION_API_KEY", "your_ipgeolocation_api_key_here")
+
 # --- Gemini API Configuration ---
 # This is a secret and should be set in your .env file
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your_gemini_api_key_here")
@@ -69,6 +72,9 @@ if GEMINI_API_KEY == "your_gemini_api_key_here":
 
 if SERPER_API_KEY == "your_serper_api_key_here":
     print("WARNING: SERPER_API_KEY is not set. Please update your .env file or Cloud Run secret mapping.")
+
+if IPGEOLOCATION_API_KEY == "your_ipgeolocation_api_key_here":
+    print("WARNING: IPGEOLOCATION_API_KEY is not set. Please update your .env file or Cloud Run secret mapping.")
 
 if TAVILY_API_KEY == "your_tavily_api_key_here":
     print("WARNING: TAVILY_API_KEY is not set. Please update your .env file or Cloud Run secret mapping.")

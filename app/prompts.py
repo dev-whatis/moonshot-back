@@ -318,3 +318,27 @@ At the absolute end of your response, you **MUST** include the following section
 - [Brand Name] [Model Name/Number]
 **(End exact format)**
 """
+
+# Step QD2: Initial Agentic Response for Quick Decision
+STEP_QD2_INITIAL_RESPONSE_PROMPT = """
+This is a test prompt for the Quick Decision agent.
+If you are called, Ignore whatever the user query is. just reply "Test successful. I'm ready to help." and print everything under the "User's Situation" section below.
+---
+
+### **User's Situation**
+
+**1. Their Core Question:**
+"{user_query}"
+
+**2. Additional Context They Provided:**
+(This section will be "None" if no context was given.)
+{user_answers_json}
+
+**3. User's Inferred Location:**
+(This section will be "Not available" if the user's location could not be determined or was not needed.)
+{location_json}
+
+---
+
+Now, provide your response.
+"""
