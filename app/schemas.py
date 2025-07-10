@@ -260,9 +260,30 @@ class DiagnosticQuestion(BaseModel):
         populate_by_name=True,
     )
 
-class StartResponse(BaseModel):
+class QuickQuestionOption(BaseModel):
+    """Data model for a simple option in a quick question (text only)."""
+    text: str = Field(..., description="The concise label for the option.")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+
+class QuickQuestion(BaseModel):
+    """Data model for a single, simple question in the Quick Decision path."""
+    question_type: Literal["single", "multi"] = Field(..., alias="questionType")
+    question: str
+    options: List[QuickQuestionOption]
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+class ProductDiscoveryPayload(BaseModel):
     """
-    Data model for the /start endpoint response body, containing the full
+    Data model for the Product Discovery response body, containing the full
     questionnaire split into budget and diagnostic sections.
     """
     budget_question: BudgetQuestion = Field(..., alias="budgetQuestion")
@@ -272,6 +293,19 @@ class StartResponse(BaseModel):
         alias_generator=to_camel,
         populate_by_name=True,
     )
+
+# Placeholder for the new flow's payload
+class QuickDecisionPayload(BaseModel):
+    """The data payload returned for the QUICK_DECISION route."""
+    need_location: bool = Field(..., alias="needLocation")
+    quick_questions: List[QuickQuestion] = Field(..., alias="quickQuestions", description="A list of simple, optional follow-up questions. Can be an empty list.")
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+# The new, unified response model for the /start endpoint
+class StartResponse(BaseModel):
+    route: Literal["PRODUCT_DISCOVERY", "QUICK_DECISION"]
+    payload: Union[ProductDiscoveryPayload, QuickDecisionPayload]
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class RejectionResponse(BaseModel):
     """
@@ -362,20 +396,17 @@ class HistoryListResponse(BaseModel):
 # Internal OpenAPI Schemas for Gemini Interactions
 # ==============================================================================
 
-# Step 0: Guardrail for Intent Classification
-GUARDRAIL_RESPONSE_SCHEMA = {
+# Step 0: Router for Intent Classification
+ROUTER_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
-        "is_product_request": {
-            "type": "boolean",
-            "description": "True if the query is a request for a physical product, otherwise False."
-        },
-        "reason": {
+        "route": {
             "type": "string",
-            "description": "A brief, user-facing explanation for why the query was rejected."
+            "description": "The determined route for the user's query.",
+            "enum": ["PRODUCT_DISCOVERY", "QUICK_DECISION", "REJECT"]
         }
     },
-    "required": ["is_product_request", "reason"]
+    "required": ["route"]
 }
 
 # Step 3a: Budget Question Generation
@@ -459,6 +490,51 @@ DIAGNOSTIC_QUESTIONS_SCHEMA = {
         }
     },
     "required": ["questions"]
+}
+
+# Step QD1: Quick Question Generation
+QUICK_QUESTIONS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "needLocation": {
+            "type": "boolean",
+            "description": "A background flag. Set to true ONLY if the decision is sensitive to real-world context (like weather) AND the user has NOT already provided a location. Otherwise, it must be false."
+        },
+        "questions": {
+            "type": "array",
+            "description": "A list of 0-3 friendly, conversational questions to help understand the user's context. An empty array [] is the correct output for mechanical queries (e.g., 'roll a dice').",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "questionType": {
+                        "type": "string",
+                        "description": "The type of question. 'multi' is preferred for a low-pressure, friendly feel.",
+                        "enum": ["single", "multi"]
+                    },
+                    "question": {
+                        "type": "string",
+                        "description": "The main text of the question presented to the user, phrased in a friendly, natural tone."
+                    },
+                    "options": {
+                        "type": "array",
+                        "description": "A list of simple choices for the question. MUST include an 'escape hatch' option like 'You decide for me'.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "text": {
+                                    "type": "string",
+                                    "description": "The concise, user-friendly label for the option."
+                                }
+                            },
+                            "required": ["text"]
+                        }
+                    }
+                },
+                "required": ["questionType", "question", "options"]
+            }
+        }
+    },
+    "required": ["needLocation", "questions"]
 }
 
 # Step FS1: Fast Search Query Generation

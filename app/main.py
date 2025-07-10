@@ -16,6 +16,7 @@ from app.routers import recommendations
 from app.routers import enrich
 from app.routers import share
 from app.routers import history
+from app.routers import paths
 from app.middleware.auth import initialize_firebase
 from app.config import AUTH_ENABLED
 
@@ -83,11 +84,11 @@ app.add_middleware(
 # ==============================================================================
 
 # Include the recommendation routes from the router file
-app.include_router(enrich.router)
-app.include_router(share.router)
-app.include_router(history.router)
-app.include_router(recommendations.rec_router)
-app.include_router(recommendations.convo_router)
+app.include_router(paths.router)              # Handles initial query routing (e.g., /api/paths/start)
+app.include_router(recommendations.router)    # Handles ongoing conversations (e.g., /api/conversations/turn)
+app.include_router(enrich.router)             # Handles product enrichment
+app.include_router(share.router)              # Handles sharing functionality
+app.include_router(history.router)            # Handles conversation history
 
 
 # ==============================================================================

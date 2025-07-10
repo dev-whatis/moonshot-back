@@ -50,6 +50,7 @@ Dockerfile
 
 # ___ Helper Files ---
 # Ignore any helper scripts or files that are not needed in the container.
+testfile.py
 fetchtoken.py
 readme.md
 user_detail_fetcher.py

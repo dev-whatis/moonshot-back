@@ -12,14 +12,16 @@ from app.config import (
     GEMINI_API_KEY, HIGH_MODEL_NAME, MID_MODEL_NAME, LOW_MODEL_NAME, DEFAULT_TEMPERATURE, THINKING_BUDGET
 )
 from app.prompts import (
-    STEP0_GUARDRAIL_PROMPT,
+    STEP0_ROUTER_PROMPT,
+    STEP_QD1_QUICK_QUESTIONS_PROMPT,
     STEP3A_BUDGET_PROMPT,
     STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT,
     STEP_FS1_FAST_SEARCH_QUERY_GENERATOR_PROMPT,
     STEP_FS2_FAST_SEARCH_SYNTHESIZER_PROMPT,
 )
 from app.schemas import (
-    GUARDRAIL_RESPONSE_SCHEMA,
+    ROUTER_RESPONSE_SCHEMA,
+    QUICK_QUESTIONS_SCHEMA,
     BUDGET_QUESTION_SCHEMA,
     DIAGNOSTIC_QUESTIONS_SCHEMA,
     FAST_SEARCH_QUERIES_SCHEMA,
@@ -61,21 +63,20 @@ def _make_stateless_call_json(model_name: str, prompt: str, schema: Dict, use_th
 # Recommendation Flow Functions (Stateless)
 # ==============================================================================
 
-def run_query_guardrail(user_query: str) -> dict:
+def run_query_router(user_query: str) -> dict:
     """
     Step 0: A stateless, one-shot call to classify the user's intent.
-    This acts as a bouncer before a full conversation session is created.
+    This acts as a router before a full conversation session is created.
     """
     try:
-        prompt = STEP0_GUARDRAIL_PROMPT.format(user_query=user_query)
+        prompt = STEP0_ROUTER_PROMPT.format(user_query=user_query)
         # Use the dedicated helper for this specific call pattern
-        return _make_stateless_call_json(LOW_MODEL_NAME, prompt, GUARDRAIL_RESPONSE_SCHEMA)
+        return _make_stateless_call_json(LOW_MODEL_NAME, prompt, ROUTER_RESPONSE_SCHEMA)
     except Exception as e:
         print(f"ERROR: Guardrail check failed with exception: {e}")
         # In case of an API error, default to rejecting the query for safety.
         return {
-            "is_product_request": False,
-            "reason": "Could not process the request due to an internal error."
+            "route": "REJECT"
         }
 
 def generate_budget_question(user_query: str) -> dict:
@@ -95,6 +96,14 @@ def generate_diagnostic_questions(user_query: str) -> list[dict]:
     prompt = STEP3B_DIAGNOSTIC_QUESTIONS_PROMPT.format(user_query=user_query)
     result = _make_stateless_call_json(LOW_MODEL_NAME, prompt, DIAGNOSTIC_QUESTIONS_SCHEMA)
     return result.get("questions", [])
+
+def generate_quick_questions(user_query: str) -> dict:
+    """
+    Step QD1: Generates a short, optional list of clarifying questions for the
+    Quick Decision path. Can return an empty list if no questions are needed.
+    """
+    prompt = STEP_QD1_QUICK_QUESTIONS_PROMPT.format(user_query=user_query)
+    return _make_stateless_call_json(LOW_MODEL_NAME, prompt, QUICK_QUESTIONS_SCHEMA)
 
 
 def generate_fast_search_queries(
@@ -156,7 +165,7 @@ WEB_SEARCH_TOOL_DECLARATION = types.Tool(
         types.FunctionDeclaration(
             name="web_search",
             description=(
-                "Performs web searches to find up-to-date information on products, services, or topics."
+                "Performs web searches to find up-to-date information on any topic."
             ),
             parameters=types.Schema(
                 type=types.Type.OBJECT,
