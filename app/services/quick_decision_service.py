@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Union
 
 # Import services, handlers, and schemas
 from app.services import llm_calls, search_functions, logging_service
-from app.schemas import InitialQuickDecisionTurnRequest, FollowupQuickDecisionTurnRequest
+from app.schemas import QuickDecisionTurnRequest
 
 # Import the new prompt for the initial turn
 from app.prompts import STEP_QD2_INITIAL_RESPONSE_PROMPT
@@ -106,7 +106,7 @@ def _run_initial_qd_turn(
     conversation_id: str,
     turn_id: str,
     user_id: str,
-    full_request: InitialQuickDecisionTurnRequest,
+    full_request: QuickDecisionTurnRequest,
     location_context: Optional[Dict[str, Any]]
 ) -> str:
     """
@@ -134,7 +134,7 @@ def _run_followup_qd_turn(
     conversation_id: str,
     turn_id: str,
     user_id: str,
-    full_request: FollowupQuickDecisionTurnRequest
+    full_request: QuickDecisionTurnRequest
 ) -> str:
     """
     Handles logic for all subsequent turns (turn_index > 0), using the
@@ -174,7 +174,7 @@ def process_quick_decision_turn_background_job(
     turn_id: str,
     turn_index: int,
     user_id: str,
-    full_request: Union[InitialQuickDecisionTurnRequest, FollowupQuickDecisionTurnRequest], # MODIFIED
+    full_request: QuickDecisionTurnRequest,
     location_context: Optional[Dict[str, Any]] = None
 ):
     """
@@ -194,20 +194,17 @@ def process_quick_decision_turn_background_job(
 
     try:
         final_model_response = ""
-        # Dispatch based on the type of the request object, which is safer.
-        if isinstance(full_request, InitialQuickDecisionTurnRequest):
+        # Dispatch based on the turn index.
+        if turn_index == 0:
             final_model_response = _run_initial_qd_turn(
                 conversation_id, turn_id, user_id, full_request, location_context
             )
-        elif isinstance(full_request, FollowupQuickDecisionTurnRequest):
+        else:
             final_model_response = _run_followup_qd_turn(
                 conversation_id, turn_id, user_id, full_request
             )
-        else:
-            # This case should ideally never be reached due to router validation.
-            raise TypeError("Invalid request type passed to background job.")
 
-        # On success, prepare the payload. Product names will always be empty for this flow.
+        # On success, prepare the payload.
         success_payload = {
             "modelResponse": final_model_response,
             "productNames": [],

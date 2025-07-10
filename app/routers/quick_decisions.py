@@ -14,8 +14,7 @@ from app.services import location_service
 from app.services import logging_service
 from app.services.history_service import get_conversation_snapshot # For ownership check
 from app.schemas import (
-    InitialQuickDecisionTurnRequest,
-    FollowupQuickDecisionTurnRequest,
+    QuickDecisionTurnRequest,
     TurnCreationResponse,
     TurnStatusResponse,
 )
@@ -46,25 +45,25 @@ router = APIRouter(
     summary="Process a quick decision conversational turn"
 )
 async def process_quick_decision_turn(
-    request: Union[InitialQuickDecisionTurnRequest, FollowupQuickDecisionTurnRequest],
+    request: QuickDecisionTurnRequest,
     background_tasks: BackgroundTasks,
     fastapi_request: Request,
     user_id: str = Depends(get_current_user)
 ):
     """
-    Processes a single turn in a "Quick Decision" conversation. This endpoint
-    accepts two different request bodies:
-    - One for creating a new conversation (initial turn).
-    - One for adding a turn to an existing conversation (follow-up turn).
+    Processes a single turn in a "Quick Decision" conversation.
 
-    It immediately returns a 202 Accepted response and triggers a
+    - If `conversationId` is null, it creates a new conversation and its first turn.
+    - If `conversationId` is provided, it adds a new turn for a follow-up question.
+
+    This endpoint immediately returns a 202 Accepted response and triggers a
     long-running background job to generate the agent's response.
     """
+    conv_id = request.conversation_id
     location_context = None
 
     # Case 1: This is a follow-up turn for an existing conversation.
-    if isinstance(request, FollowupQuickDecisionTurnRequest):
-        conv_id = request.conversation_id
+    if conv_id:
         try:
             snapshot = get_conversation_snapshot(user_id, conv_id)
             next_turn_index = len(snapshot.turns)
@@ -80,7 +79,7 @@ async def process_quick_decision_turn(
     # Case 2: This is the first turn, creating a new conversation.
     else:
         next_turn_index = 0
-        # Fetch location ONLY on the first turn if requested.
+        # Fetch location ONLY on the first turn if the flag is true.
         if request.need_location:
             print(f"Location is needed for user {user_id}. Fetching from IP.")
             location_context = await location_service.get_location_from_request(fastapi_request)

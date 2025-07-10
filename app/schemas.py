@@ -131,34 +131,23 @@ class QuickDecisionAnswer(BaseModel):
         populate_by_name=True,
     )
 
-class InitialQuickDecisionTurnRequest(BaseModel):
+class QuickDecisionTurnRequest(BaseModel):
     """
-    Data model for creating the FIRST turn of a Quick Decision conversation.
+    Data model for the POST /api/quick-decisions/turn endpoint.
+    Handles both creating and adding turns to a Quick Decision conversation.
     """
-    user_query: str = Field(
-        ..., alias="userQuery", description="The user's initial prompt."
+    conversation_id: Optional[str] = Field(
+        None, alias="conversationId", description="The ID of the conversation. If null, a new conversation is created."
     )
-    need_location: bool = Field(
-        ..., alias="needLocation", description="Flag indicating if location context is relevant, from /paths/start."
+    user_query: str = Field(
+        ..., alias="userQuery", description="The user's prompt for this specific turn."
+    )
+    # These fields are ONLY for the first turn. They are optional for follow-ups.
+    need_location: Optional[bool] = Field(
+        None, alias="needLocation", description="Flag for location context. Only for the first turn."
     )
     user_answers: Optional[List[QuickDecisionAnswer]] = Field(
-        None, alias="userAnswers", description="Optional answers from the initial questionnaire."
-    )
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-class FollowupQuickDecisionTurnRequest(BaseModel):
-    """
-    Data model for adding a SUBSEQUENT turn to an existing Quick Decision conversation.
-    """
-    conversation_id: str = Field(
-        ..., alias="conversationId", description="The ID of the existing conversation. This is required."
-    )
-    user_query: str = Field(
-        ..., alias="userQuery", description="The user's follow-up prompt."
+        None, alias="userAnswers", description="Optional answers from the questionnaire. Only for the first turn."
     )
 
     model_config = ConfigDict(
