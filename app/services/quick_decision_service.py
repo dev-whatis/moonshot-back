@@ -187,9 +187,6 @@ def process_quick_decision_turn_background_job(
     if location_context:
         log_request_data["_inferredLocation"] = location_context
 
-    log_payload = {"userId": user_id, "request": log_request_data}
-    logging_service.log_step(conversation_id, turn_id, f"00_qd_turn_{turn_index}_start", log_payload)
-
     final_status = ""
 
     try:
@@ -213,7 +210,6 @@ def process_quick_decision_turn_background_job(
         final_status = "complete"
         logging_service.update_turn_status(conversation_id, turn_id, final_status, success_payload)
         
-        logging_service.log_step(conversation_id, turn_id, f"99_qd_turn_{turn_index}_complete", success_payload)
         print(f"QUICK DECISION JOB SUCCEEDED for Turn {turn_index}, ConvID: {conversation_id}")
 
     except Exception as e:
@@ -224,8 +220,6 @@ def process_quick_decision_turn_background_job(
         
         final_status = "failed"
         logging_service.update_turn_status(conversation_id, turn_id, final_status, failure_payload)
-        
-        logging_service.log_step(conversation_id, turn_id, f"99_qd_turn_{turn_index}_failed", failure_payload)
 
     finally:
         if turn_index == 0 and final_status in ["complete", "failed"]:

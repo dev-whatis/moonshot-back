@@ -1,15 +1,14 @@
 """
-(logging_service.py) Handles writing conversation data to Firestore and GCS.
+(logging_service.py) Handles writing conversation data to Firestore.
 This version supports the multi-turn conversational data model.
 """
 
-import json
-import datetime
 import uuid
-from typing import Optional, Dict, Any, Tuple
-from google.cloud import firestore, storage
+from typing import Tuple, Dict, Any
 
-from app.config import GCP_PROJECT_ID, GCS_BUCKET_NAME, CONVERSATION_ID_ENABLED
+from google.cloud import firestore
+
+from app.config import GCP_PROJECT_ID
 
 # ==============================================================================
 # Client Initialization
@@ -18,94 +17,11 @@ from app.config import GCP_PROJECT_ID, GCS_BUCKET_NAME, CONVERSATION_ID_ENABLED
 # Initialize clients once when the module is imported.
 try:
     firestore_client = firestore.Client(project=GCP_PROJECT_ID)
-    storage_client = storage.Client(project=GCP_PROJECT_ID)
-    gcs_bucket = storage_client.bucket(GCS_BUCKET_NAME)
-    print("Successfully initialized Firestore and GCS clients.")
+    print("Successfully initialized Firestore client.")
 except Exception as e:
     firestore_client = None
-    storage_client = None
-    gcs_bucket = None
-    print(f"ERROR: Failed to initialize Google Cloud clients: {e}")
-    print("WARNING: Conversation logging will be disabled.")
-
-
-# ==============================================================================
-# GCS Logging Functions
-# ==============================================================================
-
-def log_step(
-    conversation_id: Optional[str],
-    turn_id: Optional[str],
-    step_name: str,
-    step_data: Dict[str, Any]
-):
-    """
-    Logs the data for a single step of a conversation turn to GCS for debugging.
-
-    Args:
-        conversation_id: The unique ID for the conversation.
-        turn_id: The unique ID for the specific turn within the conversation.
-        step_name: The name of the file to be created (e.g., "01_start").
-        step_data: A dictionary containing the JSON-serializable data for this step.
-    """
-    if not all([CONVERSATION_ID_ENABLED, conversation_id, turn_id]):
-        print(f"INFO: GCS logging for step '{step_name}' skipped (disabled or missing IDs).")
-        return
-
-    if not gcs_bucket:
-        print(f"Skipping log for conv {conversation_id}, turn {turn_id} because GCS client is not initialized.")
-        return
-
-    try:
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
-        
-        # Add metadata to the log payload
-        step_data["_log_timestamp_utc"] = now_utc.isoformat()
-        step_data["_step_name"] = step_name
-        step_data["_conversation_id"] = conversation_id
-        step_data["_turn_id"] = turn_id
-        
-        # Construct the partitioned GCS object path with turn_id
-        year, month, day = now_utc.strftime("%Y"), now_utc.strftime("%m"), now_utc.strftime("%d")
-        gcs_path = f"traces/{year}/{month}/{day}/{conversation_id}/{turn_id}/{step_name}.json"
-        
-        blob = gcs_bucket.blob(gcs_path)
-        log_json = json.dumps(step_data, indent=2, ensure_ascii=False)
-        blob.upload_from_string(log_json, content_type="application/json")
-        
-        print(f"Successfully saved GCS log to: {gcs_path}")
-
-    except Exception as e:
-        print(f"ERROR: Failed to save GCS log for conv {conversation_id}, turn {turn_id}, step {step_name}: {e}")
-
-
-def save_rejected_query(rejection_data: dict):
-    """
-    Saves a record of a rejected query to a dedicated location in GCS.
-    (This function is pre-conversation and remains unchanged).
-    """
-    if not gcs_bucket:
-        print("Skipping rejection logging because GCS client is not initialized.")
-        return
-
-    try:
-        rejection_id = rejection_data.get("rejectionId", "unknown-rejection-id")
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
-        year, month, day = now_utc.strftime("%Y"), now_utc.strftime("%m"), now_utc.strftime("%d")
-        gcs_path = f"traces/{year}/{month}/{day}/{rejection_id}/00_rejection.json"
-        
-        blob = gcs_bucket.blob(gcs_path)
-        rejection_data["_log_timestamp_utc"] = now_utc.isoformat()
-        rejection_data["_conversation_id"] = rejection_id
-        rejection_data["_step_name"] = "00_rejection"
-        log_json = json.dumps(rejection_data, indent=2, ensure_ascii=False)
-        blob.upload_from_string(log_json, content_type="application/json")
-        
-        print(f"Successfully saved rejected query log for id '{rejection_id}' to GCS.")
-
-    except Exception as e:
-        rejection_id_for_error = rejection_data.get("rejectionId")
-        print(f"ERROR: Failed to save rejected query log to GCS for id '{rejection_id_for_error}': {e}")
+    print(f"ERROR: Failed to initialize Google Cloud client (Firestore): {e}")
+    print("WARNING: Conversation persistence will be disabled.")
 
 
 # ==============================================================================

@@ -248,8 +248,6 @@ def process_turn_background_job(
     Crucially, if this is the first turn, it also updates the parent conversation
     document with the final status of this initial turn.
     """
-    log_payload = {"userId": user_id, "request": full_request.model_dump(by_alias=True)}
-    logging_service.log_step(conversation_id, turn_id, f"00_turn_{turn_index}_start", log_payload)
 
     final_status = "" # Variable to hold the final status
 
@@ -275,7 +273,6 @@ def process_turn_background_job(
         final_status = "complete" # Set status for success case
         logging_service.update_turn_status(conversation_id, turn_id, final_status, success_payload)
         
-        logging_service.log_step(conversation_id, turn_id, f"99_turn_{turn_index}_complete", success_payload)
         print(f"BACKGROUND JOB SUCCEEDED for Turn {turn_index}, ConvID: {conversation_id}")
 
     except Exception as e:
@@ -286,8 +283,6 @@ def process_turn_background_job(
         
         final_status = "failed" # Set status for failure case
         logging_service.update_turn_status(conversation_id, turn_id, final_status, failure_payload)
-        
-        logging_service.log_step(conversation_id, turn_id, f"99_turn_{turn_index}_failed", failure_payload)
 
     finally:
         # This block will run after the try/except block, regardless of outcome.

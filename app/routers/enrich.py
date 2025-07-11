@@ -14,7 +14,7 @@ from app.schemas import EnrichTurnRequest, EnrichResponse
 from app.middleware.auth import get_current_user
 
 # Import the logging functions
-from app.services.logging_service import log_step, update_turn_with_enrichment
+from app.services.logging_service import update_turn_with_enrichment
 
 # ==============================================================================
 # Router Setup
@@ -34,7 +34,7 @@ router = APIRouter(
     response_model=EnrichResponse
 )
 async def get_product_enrichment(
-    request: EnrichTurnRequest,  # MODIFIED: Use the new request model
+    request: EnrichTurnRequest,
     background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user)
 ):
@@ -54,36 +54,18 @@ async def get_product_enrichment(
         # The core enrichment logic is unchanged
         enriched_data = await enrich_products(request.product_names)
         
-        # --- LOGGING ON SUCCESS ---
-        # 1. Log the enrichment step trace to GCS, now with turn_id
-        enrich_log_payload = {
-            "userId": user_id,
-            "productNames": request.product_names,
-            "enrichedProducts": enriched_data["enrichedProducts"]
-        }
-        background_tasks.add_task(log_step, conv_id, turn_id, "03_enrich", enrich_log_payload)
-
-        # 2. Update the specific turn document in Firestore with enriched data
+        # Update the specific turn document in Firestore with enriched data
         background_tasks.add_task(
-            update_turn_with_enrichment, # MODIFIED: Use the new logging function
+            update_turn_with_enrichment,
             conv_id,
             turn_id,
             enriched_data["enrichedProducts"]
         )
-        # --- END LOGGING ---
         
         return enriched_data
         
     except Exception as e:
         print(f"ERROR during enrichment for user {user_id}, conv {conv_id}, turn {turn_id}: {e}")
-        
-        failure_log_payload = {
-            "userId": user_id,
-            "productNames": request.product_names,
-            "error": str(e)
-        }
-        # Log the failure with the turn context
-        background_tasks.add_task(log_step, conv_id, turn_id, "03_enrich_failure", failure_log_payload)
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

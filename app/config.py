@@ -52,8 +52,6 @@ THINKING_BUDGET = -1
 # --- Google Cloud Project Configuration ---
 # Your Google Cloud Project ID
 GCP_PROJECT_ID = "moonshot-69420"
-# The name of the GCS bucket for storing raw trace logs
-GCS_BUCKET_NAME = "moonshot-69420-llm-traces"
 
 # Maximum number of concurrent requests for parallel scraping/searching Tavily
 MAX_CONCURRENT_REQUESTS = 5
