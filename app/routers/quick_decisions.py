@@ -98,7 +98,8 @@ async def create_turn(
         turn_index=next_turn_index,
         user_id=user_id,
         full_request=request,
-        location_context=location_context
+        location_context=location_context,
+        user_local_time=request.user_local_time
     )
 
     return {"conversation_id": conv_id, "turn_id": turn_id, "status": "processing"}

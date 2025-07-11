@@ -121,6 +121,9 @@ class QuickDecisionTurnRequest(BaseModel):
     need_location: Optional[bool] = Field(
         None, alias="needLocation", description="Flag for location context. Only for the first turn."
     )
+    user_local_time: Optional[str] = Field(
+        None, alias="userLocalTime", description="The user's current local date and time as a string. Only for the first turn."
+    )
     user_answers: Optional[List[StandardMCQAnswer]] = Field(
         None, alias="userAnswers", description="Optional answers from the questionnaire. Only for the first turn."
     )

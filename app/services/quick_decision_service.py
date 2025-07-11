@@ -107,7 +107,8 @@ def _run_initial_qd_turn(
     turn_id: str,
     user_id: str,
     full_request: QuickDecisionTurnRequest,
-    location_context: Optional[Dict[str, Any]]
+    location_context: Optional[Dict[str, Any]],
+    user_local_time: Optional[str]
 ) -> str:
     """
     Handles the logic for the first turn (turn_index == 0), using the
@@ -117,11 +118,12 @@ def _run_initial_qd_turn(
     
     user_answers_dict = [answer.model_dump(by_alias=True) for answer in full_request.user_answers] if full_request.user_answers else None
     
-    # Format the prompt with the user's specific data, including location.
+    # Format the prompt with the user's specific data, including location and time.
     prompt = STEP_QD2_INITIAL_RESPONSE_PROMPT.format(
         user_query=full_request.user_query,
         user_answers_json=json.dumps(user_answers_dict, indent=2) if user_answers_dict else "None",
-        location_json=json.dumps(location_context, indent=2) if location_context else "Not available"
+        location_json=json.dumps(location_context, indent=2) if location_context else "Not available",
+        user_local_time_context=user_local_time if user_local_time else "Not provided"
     )
 
     # The "history" for this one-shot agentic call is just a single user message.
@@ -175,7 +177,8 @@ def process_quick_decision_turn_background_job(
     turn_index: int,
     user_id: str,
     full_request: QuickDecisionTurnRequest,
-    location_context: Optional[Dict[str, Any]] = None
+    location_context: Optional[Dict[str, Any]] = None,
+    user_local_time: Optional[str] = None
 ):
     """
     The main, long-running function for processing a Quick Decision turn.
@@ -194,7 +197,7 @@ def process_quick_decision_turn_background_job(
         # Dispatch based on the turn index.
         if turn_index == 0:
             final_model_response = _run_initial_qd_turn(
-                conversation_id, turn_id, user_id, full_request, location_context
+                conversation_id, turn_id, user_id, full_request, location_context, user_local_time
             )
         else:
             final_model_response = _run_followup_qd_turn(

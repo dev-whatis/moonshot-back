@@ -325,7 +325,7 @@ This is a test prompt for the Quick Decision agent.
 If you are called, Ignore whatever the user query is. just reply "Test successful. I'm ready to help." and print everything under the "User's Situation" section below.
 ---
 
-### **User's Situation**
+### **User's Context**
 
 **1. Their Core Question:**
 "{user_query}"
@@ -337,6 +337,10 @@ If you are called, Ignore whatever the user query is. just reply "Test successfu
 **3. User's Inferred Location:**
 (This section will be "Not available" if the user's location could not be determined or was not needed.)
 {location_json}
+
+**4. User's Current Date & Time:**
+(This section will be "Not provided" if not available.)
+{user_local_time_context}
 
 ---
 
