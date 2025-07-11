@@ -6,7 +6,6 @@ workflow to start (e.g., a deep-dive product discovery or a quick decision).
 
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Literal
 
 # Import services and handlers
 from app.services import llm_calls

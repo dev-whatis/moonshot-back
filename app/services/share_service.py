@@ -4,7 +4,6 @@ publicly shareable recommendation links, compatible with the multi-turn data mod
 """
 
 import secrets
-from typing import Dict, Any
 
 from google.cloud import firestore
 

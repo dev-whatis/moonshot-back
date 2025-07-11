@@ -4,7 +4,7 @@
 a structured initial response followed by a conversational follow-up agent.
 """
 import json
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 
 # Import services, handlers, and schemas
 from app.services import llm_calls, search_functions, logging_service

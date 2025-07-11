@@ -8,24 +8,63 @@ from pydantic.alias_generators import to_camel
 from typing import List, Optional, Literal, Union
 from datetime import datetime
 
-# ==============================================================================
-# Pydantic Models for the FastAPI Application
-# These define the public-facing API data contracts.
-# ==============================================================================
 
+# ********************************************************************************
 # --- Request Models ---
+# ********************************************************************************
+
+
+
+# ==============================================================================
+# --- Request Model for Starting a Conversation ---
+# ==============================================================================
 
 class StartRequest(BaseModel):
     """Data model for the /start endpoint request body."""
     user_query: str = Field(..., example="I need a good laptop for college")
 
-    # This config makes the API consistent, accepting camelCase for this model too.
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-# NEW: Universal request model for creating any turn (initial or followup)
+
+# ==============================================================================
+# --- Request Models for Product Discovery Path ---
+# ==============================================================================
+
+class PriceAnswer(BaseModel):
+    """
+    Data model for the user's answer to the budget question.
+    It includes the original question text for full context.
+    """
+    question_type: Literal["price"] = Field(..., alias="questionType")
+    question: str = Field(..., description="The exact question text that was asked.")
+    min: Optional[float] = Field(None, description="The minimum budget selected by the user.")
+    max: Optional[float] = Field(None, description="The maximum budget selected by the user.")
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+class AnswerOption(BaseModel):
+    """Data model for a single selected option within a user's answer."""
+    text: str = Field(..., description="The concise label for the option.")
+    description: str = Field(..., description="A short explanation of this choice.")
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+class DiagnosticAnswer(BaseModel):
+    """
+    Data model for the user's answer to a single or multi-choice question.
+    This structure mirrors the DiagnosticQuestion model, but replaces the full
+    list of 'options' with the user's selected 'userAnswers'.
+    """
+    question_type: Literal["single", "multi"] = Field(..., alias="questionType")
+    question: str = Field(..., description="The exact question text that was asked.")
+    description: str = Field(..., description="The explanation of why this question was important.")
+    user_answers: List[AnswerOption] = Field(
+        ..., alias="userAnswers", description="A list of the option(s) the user selected."
+    )
+    
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
 class TurnRequest(BaseModel):
     """
     Data model for the POST /api/conversations/turn endpoint.
@@ -41,12 +80,13 @@ class TurnRequest(BaseModel):
         None, alias="userAnswers", description="The user's answers from the initial questionnaire. Only provided for the first turn."
     )
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-# MODIFIED: Renamed and repurposed for enriching a specific turn
+
+# ==============================================================================
+# Request Models for Enriching Product Recommendations
+# ==============================================================================
+
 class EnrichTurnRequest(BaseModel):
     """Data model for the /enrich endpoint request body."""
     conversation_id: str = Field(
@@ -59,62 +99,18 @@ class EnrichTurnRequest(BaseModel):
         ..., alias="productNames", description="A list of product names to be enriched with images and shopping links."
     )
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-class AnswerOption(BaseModel):
-    """Data model for a single selected option within a user's answer."""
-    text: str = Field(..., description="The concise label for the option.")
-    description: str = Field(..., description="A short explanation of this choice.")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-class PriceAnswer(BaseModel):
-    """
-    Data model for the user's answer to the budget question.
-    It includes the original question text for full context.
-    """
-    question_type: Literal["price"] = Field(..., alias="questionType")
-    question: str = Field(..., description="The exact question text that was asked.")
-    min: Optional[float] = Field(None, description="The minimum budget selected by the user.")
-    max: Optional[float] = Field(None, description="The maximum budget selected by the user.")
-    
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-class DiagnosticAnswer(BaseModel):
-    """
-    Data model for the user's answer to a single or multi-choice question.
-    This structure mirrors the DiagnosticQuestion model, but replaces the full
-    list of 'options' with the user's selected 'userAnswers'.
-    """
-    question_type: Literal["single", "multi"] = Field(..., alias="questionType")
-    question: str = Field(..., description="The exact question text that was asked.")
-    description: str = Field(..., description="The explanation of why this question was important.")
-    user_answers: List[AnswerOption] = Field(
-        ..., alias="userAnswers", description="A list of the option(s) the user selected."
-    )
-    
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+# ==============================================================================
+# Request Models for Quick Decision Path
+# ==============================================================================
 
 class QuickAnswerOption(BaseModel):
     """Data model for a single selected option in a quick decision answer."""
     text: str = Field(..., description="The concise label for the option.")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class QuickDecisionAnswer(BaseModel):
     """
@@ -126,10 +122,7 @@ class QuickDecisionAnswer(BaseModel):
         ..., alias="userAnswers", description="A list of the option(s) the user selected."
     )
     
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 class QuickDecisionTurnRequest(BaseModel):
     """
@@ -142,7 +135,6 @@ class QuickDecisionTurnRequest(BaseModel):
     user_query: str = Field(
         ..., alias="userQuery", description="The user's prompt for this specific turn."
     )
-    # These fields are ONLY for the first turn. They are optional for follow-ups.
     need_location: Optional[bool] = Field(
         None, alias="needLocation", description="Flag for location context. Only for the first turn."
     )
@@ -150,56 +142,27 @@ class QuickDecisionTurnRequest(BaseModel):
         None, alias="userAnswers", description="Optional answers from the questionnaire. Only for the first turn."
     )
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-# --- Updated FinalizeRequest to use the new answer models ---
-class FinalizeRequest(BaseModel):
-    """Data model for the /finalize endpoint request body."""
-    conversation_id: Optional[str] = Field(
-        None, alias="conversationId", description="The unique ID for the conversation flow. Optional for local testing."
-    )
-    user_query: str = Field(
-        ..., alias="userQuery", description="The original user query, passed back by the client."
-    )
-    user_answers: List[Union[PriceAnswer, DiagnosticAnswer]] = Field(
-        ..., alias="userAnswers", description="A list of the user's answers, matching the new rich format."
-    )
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-class EnrichRequest(BaseModel):
-    """Data model for the /enrich endpoint request body."""
-    conversation_id: Optional[str] = Field(
-        None, alias="conversationId", description="The ID of the recommendation conversation this enrichment is for. Optional for local testing."
-    )
-    product_names: List[str] = Field(
-        ..., alias="productNames", description="A list of product names to be enriched with images and shopping links."
-    )
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+# ==============================================================================
+# Request Model for Sharing Conversations
+# ==============================================================================
 
 class ShareCreateRequest(BaseModel):
     """Data model for the POST /api/share endpoint request body."""
     conversation_id: str = Field(..., alias="conversationId", description="The ID of the conversation to be shared.")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+
+# ********************************************************************************
 # --- Response Models ---
+# ********************************************************************************
 
-# NEW: Immediate response after creating a turn.
+
+
 class TurnCreationResponse(BaseModel):
     """
     Data model for the immediate response from POST /api/conversations/turn.
@@ -209,12 +172,8 @@ class TurnCreationResponse(BaseModel):
     turn_id: str = Field(..., alias="turnId")
     status: str = Field(..., description="The initial status of the job (e.g., 'processing').")
     
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-# NEW: Response for polling the status of a single turn.
 class TurnStatusResponse(BaseModel):
     """
     Data model for the GET /api/conversations/turn_status/{turnId} endpoint.
@@ -233,13 +192,9 @@ class TurnStatusResponse(BaseModel):
         None, description="If the status is 'failed', this will contain the error message."
     )
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
-# NEW: The main data model for a single conversational turn.
 class Turn(BaseModel):
     """Data model representing a single turn within a conversation."""
     turn_id: str = Field(..., alias="turnId")
@@ -252,12 +207,8 @@ class Turn(BaseModel):
     created_at: datetime = Field(..., alias="createdAt")
     error: Optional[str] = None
     
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-# NEW: The master response object for fetching a full conversation.
 class ConversationResponse(BaseModel):
     """
     Data model for the response from GET /api/history/{conversationId}
@@ -266,14 +217,14 @@ class ConversationResponse(BaseModel):
     conversation_id: str = Field(..., alias="conversationId")
     user_id: str = Field(..., alias="userId")
     title: str
+    conversation_type: Literal["PRODUCT_DISCOVERY", "QUICK_DECISION", "UNKNOWN"] = Field(
+        ..., alias="conversationType", description="The type of conversation, for routing follow-ups on the client."
+    )
     created_at: datetime = Field(..., alias="createdAt")
     updated_at: datetime = Field(..., alias="updatedAt")
     turns: List[Turn]
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 class BudgetObject(BaseModel):
     """Data model for the extracted budget values."""
@@ -286,10 +237,7 @@ class BudgetQuestion(BaseModel):
     question: str
     price: BudgetObject
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 class DiagnosticQuestionOption(BaseModel):
     """Data model for an option within a diagnostic question."""
@@ -303,19 +251,13 @@ class DiagnosticQuestion(BaseModel):
     description: str = Field(..., description="An explanation of why this question is important.")
     options: List[DiagnosticQuestionOption]
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 class QuickQuestionOption(BaseModel):
     """Data model for a simple option in a quick question (text only)."""
     text: str = Field(..., description="The concise label for the option.")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 
 class QuickQuestion(BaseModel):
@@ -324,10 +266,7 @@ class QuickQuestion(BaseModel):
     question: str
     options: List[QuickQuestionOption]
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 class ProductDiscoveryPayload(BaseModel):
     """
@@ -337,19 +276,14 @@ class ProductDiscoveryPayload(BaseModel):
     budget_question: BudgetQuestion = Field(..., alias="budgetQuestion")
     diagnostic_questions: List[DiagnosticQuestion] = Field(..., alias="diagnosticQuestions")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
-# Placeholder for the new flow's payload
 class QuickDecisionPayload(BaseModel):
     """The data payload returned for the QUICK_DECISION route."""
     need_location: bool = Field(..., alias="needLocation")
     quick_questions: List[QuickQuestion] = Field(..., alias="quickQuestions", description="A list of simple, optional follow-up questions. Can be an empty list.")
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-# The new, unified response model for the /start endpoint
 class StartResponse(BaseModel):
     route: Literal["PRODUCT_DISCOVERY", "QUICK_DECISION"]
     payload: Union[ProductDiscoveryPayload, QuickDecisionPayload]
@@ -377,30 +311,19 @@ class EnrichedProduct(BaseModel):
     images: List[str] = Field(..., description="A list of curated image URLs for the product.")
     shopping_links: List[ShoppingLink] = Field(..., alias="shoppingLinks", description="A list of curated shopping links for the product.")
     
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 class EnrichResponse(BaseModel):
     """Data model for the /enrich endpoint response body."""
     enriched_products: List[EnrichedProduct] = Field(..., alias="enrichedProducts")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 class ShareCreateResponse(BaseModel):
     """Data model for the POST /api/share endpoint response body."""
     share_id: str = Field(..., alias="shareId", description="The unique, public ID for the shared recommendation.")
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
-
-# MODIFIED: The response for a public share link is now the full conversation object.
 class ShareDataResponse(ConversationResponse):
     """
     Data model for the public GET /api/share/{shareId} endpoint.
@@ -413,10 +336,7 @@ class HistoryUpdateRequest(BaseModel):
     """Data model for the PATCH /api/history/{conversationId} endpoint body."""
     title: str = Field(..., description="The new user-defined title for the conversation.")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 class HistorySummaryItem(BaseModel):
     """Data model for a single item in the user's history list."""
@@ -425,20 +345,14 @@ class HistorySummaryItem(BaseModel):
     created_at: datetime = Field(..., alias="createdAt", description="The timestamp when the conversation was started.")
     status: str = Field(..., description="The final status of the conversation (e.g., 'complete', 'failed').")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 class HistoryListResponse(BaseModel):
     """Data model for the GET /api/history endpoint response."""
     history: List[HistorySummaryItem]
     next_cursor: Optional[str] = Field(None, alias="nextCursor", description="The cursor to use for fetching the next page of results. Null if this is the last page.")
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict( alias_generator=to_camel, populate_by_name=True)
 
 # ==============================================================================
 # Internal OpenAPI Schemas for Gemini Interactions

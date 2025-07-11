@@ -12,7 +12,6 @@ from app.services import history_service
 from app.schemas import (
     HistoryListResponse,
     HistoryUpdateRequest,
-    ShareDataResponse,
     ConversationResponse
 )
 

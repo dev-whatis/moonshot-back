@@ -2,7 +2,7 @@
 (share.py) Defines the API routes for creating and viewing shared recommendations.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 
 # Import the service functions that contain the business logic
 from app.services import share_service
@@ -11,7 +11,6 @@ from app.services import share_service
 from app.schemas import (
     ShareCreateRequest,
     ShareCreateResponse,
-    ShareDataResponse,
     ConversationResponse
 )
 

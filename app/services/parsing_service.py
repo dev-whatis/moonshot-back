@@ -4,7 +4,7 @@ from text content, such as LLM-generated Markdown.
 """
 
 import re
-from typing import List, Dict
+from typing import List
 
 # --- MODIFICATION START: The function is renamed and its logic is completely rewritten ---
 

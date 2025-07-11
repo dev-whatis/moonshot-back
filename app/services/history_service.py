@@ -3,7 +3,7 @@
 user conversation history, compatible with the multi-turn data model.
 """
 
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Tuple, List, Optional
 
 from google.cloud import firestore
 
@@ -131,6 +131,7 @@ def get_conversation_snapshot(user_id: str, conversation_id: str) -> Conversatio
         conversation_id=history_doc.id,
         user_id=history_data.get("userId"),
         title=history_data.get("title", "Untitled Conversation"),
+        conversation_type=history_data.get("conversationType", "UNKNOWN"),
         created_at=history_data.get("createdAt"),
         updated_at=history_data.get("updatedAt"),
         turns=turns_list

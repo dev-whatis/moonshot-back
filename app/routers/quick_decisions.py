@@ -4,7 +4,6 @@ This router handles creating and polling conversational turns for simple, agenti
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query, Request
-from typing import Union
 
 # Import the service function for the new background job
 from app.services.quick_decision_service import process_quick_decision_turn_background_job
