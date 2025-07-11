@@ -1,5 +1,5 @@
 """
-(recommendations.py) Defines the API routes for an ongoing product recommendation conversation.
+(product_discovery.py) Defines the API routes for an ongoing product recommendation conversation.
 This router handles the creation and polling of individual conversational turns.
 """
 
@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, 
 
 # Import services and handlers
 from app.services import logging_service
-from app.services.recommendation_service import process_turn_background_job
+from app.services.product_discovery_service import process_product_discovery_turn_job
 from app.services.history_service import get_conversation_snapshot # For ownership check
 
 # Import the Pydantic schemas relevant to conversational turns
@@ -27,10 +27,10 @@ from google.cloud import firestore
 # Router Setup
 # ==============================================================================
 
-# This single router now handles all conversation-related endpoints.
+# This single router now handles all product discovery related endpoints.
 router = APIRouter(
-    prefix="/api/conversations",
-    tags=["Conversations"]
+    prefix="/api/product-discovery",
+    tags=["Product Discovery"]
 )
 
 # ==============================================================================
@@ -41,18 +41,18 @@ router = APIRouter(
     "/turn",
     response_model=TurnCreationResponse,
     status_code=status.HTTP_202_ACCEPTED,
-    summary="Process a conversational turn"
+    summary="Process a product discovery conversational turn"
 )
-async def process_conversation_turn(
+async def create_turn(
     request: TurnRequest,
     background_tasks: BackgroundTasks,
     user_id: str = Depends(get_current_user)
 ):
     """
-    Processes a single turn in a conversation.
+    Processes a single turn in a "Product Discovery" conversation.
 
     - If `conversationId` is null, it creates a new conversation and its first turn.
-      This happens after the user answers the questionnaire from the `/paths/start` endpoint.
+      This happens after the user answers the questionnaire from the `/routes/start` endpoint.
     - If `conversationId` is provided, it adds a new turn to the existing conversation for follow-up questions.
 
     This endpoint immediately returns a 202 Accepted response and triggers a
@@ -91,7 +91,7 @@ async def process_conversation_turn(
 
     # Schedule the universal background job to handle the actual processing
     background_tasks.add_task(
-        process_turn_background_job,
+        process_product_discovery_turn_job,
         conversation_id=conv_id,
         turn_id=turn_id,
         turn_index=next_turn_index,
@@ -105,15 +105,15 @@ async def process_conversation_turn(
 @router.get(
     "/turn_status/{turn_id}",
     response_model=TurnStatusResponse,
-    summary="Get the status of a specific turn"
+    summary="Get the status of a specific product discovery turn"
 )
-async def get_turn_status(
+async def get_turn(
     turn_id: str,
     conversation_id: str = Query(..., alias="conversationId", description="The parent conversation ID for the turn."),
     user_id: str = Depends(get_current_user)
 ):
     """
-    Poll this endpoint to get the current status of a specific turn's processing job.
+    Poll this endpoint to get the current status of a specific product discovery turn's processing job.
 
     Once the status is 'complete', the response will include the 'modelResponse'
     and 'productNames'. If the status is 'failed', it will include an 'error' message.

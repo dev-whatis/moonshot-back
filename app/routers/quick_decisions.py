@@ -43,7 +43,7 @@ router = APIRouter(
     status_code=status.HTTP_202_ACCEPTED,
     summary="Process a quick decision conversational turn"
 )
-async def process_quick_decision_turn(
+async def create_turn(
     request: QuickDecisionTurnRequest,
     background_tasks: BackgroundTasks,
     fastapi_request: Request,
@@ -109,7 +109,7 @@ async def process_quick_decision_turn(
     response_model=TurnStatusResponse,
     summary="Get the status of a specific quick decision turn"
 )
-async def get_quick_decision_turn_status(
+async def get_turn(
     turn_id: str,
     conversation_id: str = Query(..., alias="conversationId", description="The parent conversation ID for the turn."),
     user_id: str = Depends(get_current_user)

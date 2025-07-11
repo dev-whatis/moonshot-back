@@ -12,11 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 # Import routers and middleware initializers
-from app.routers import recommendations
+from app.routers import product_discovery
 from app.routers import enrich
 from app.routers import share
 from app.routers import history
-from app.routers import paths
+from app.routers import router as router_main
 from app.routers import quick_decisions
 from app.middleware.auth import initialize_firebase
 from app.config import AUTH_ENABLED
@@ -85,12 +85,12 @@ app.add_middleware(
 # ==============================================================================
 
 # Include the recommendation routes from the router file
-app.include_router(paths.router)              # Handles initial query routing (e.g., /api/paths/start)
-app.include_router(recommendations.router)    # Handles ongoing conversations (e.g., /api/conversations/turn)
+app.include_router(router_main.router)        # Handles initial query routing (e.g., /api/routes/start)
+app.include_router(product_discovery.router)  # Handles ongoing conversations (e.g., /api/product-discovery/turn)
 app.include_router(enrich.router)             # Handles product enrichment
 app.include_router(share.router)              # Handles sharing functionality
 app.include_router(history.router)            # Handles conversation history
-app.include_router(quick_decisions.router)    # Handles quick decision-making
+app.include_router(quick_decisions.router)    # Handles quick decision-making (e.g., /api/quick-decisions/turn)
 
 
 # ==============================================================================

@@ -1,6 +1,6 @@
 """
-(recommendation_service.py) Contains the long-running business logic for the
-recommendation generation process. This is designed to be run as a background task.
+(product_discovery_service.py) Contains the long-running business logic for the
+product discovery process. This is designed to be run as a background task.
 This service now contains a universal turn processor for any conversational turn.
 """
 import datetime
@@ -231,7 +231,7 @@ def _run_initial_turn(
 
 # In recommendation_service.py
 
-def process_turn_background_job(
+def process_product_discovery_turn_job(
     conversation_id: str,
     turn_id: str,
     turn_index: int,

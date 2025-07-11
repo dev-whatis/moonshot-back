@@ -3,9 +3,9 @@ file paths:
 app/middleware/auth.py
 app/routers/enrich.py
 app/routers/history.py
-app/routers/paths.py
+app/routers/product_discovery.py
 app/routers/quick_decisions.py
-app/routers/recommendations.py
+app/routers/paths.py
 app/routers/share.py
 
 app/services/enrichment_service.py
@@ -14,8 +14,8 @@ app/services/llm_calls.py
 app/services/location_service.py
 app/services/logging_service.py
 app/services/parsing_service.py
+app/services/product_discovery_service.py
 app/services/quick_decision_service.py
-app/services/recommendation_service.py
 app/services/search_functions.py
 app/services/share_service.py
 

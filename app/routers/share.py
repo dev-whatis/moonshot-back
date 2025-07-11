@@ -11,7 +11,7 @@ from app.services import share_service
 from app.schemas import (
     ShareCreateRequest,
     ShareCreateResponse,
-    ConversationResponse
+    ShareDataResponse
 )
 
 # Import the dependency for authentication
@@ -73,7 +73,7 @@ async def create_share_link_endpoint(
 
 @router.get(
     "/{share_id}",
-    response_model=ConversationResponse,
+    response_model=ShareDataResponse,
     summary="Get data for a shared recommendation"
 )
 async def get_shared_data_endpoint(share_id: str):
