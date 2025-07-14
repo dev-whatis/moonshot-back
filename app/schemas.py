@@ -314,7 +314,7 @@ ROUTER_RESPONSE_SCHEMA = {
         "route": {
             "type": "string",
             "description": "The determined route for the user's query.",
-            "enum": ["PRODUCT_DISCOVERY", "QUICK_DECISION", "REJECT"]
+            "enum": ["PRODUCT_DISCOVERY", "REJECT"]
         }
     },
     "required": ["route"]
@@ -360,43 +360,35 @@ DIAGNOSTIC_QUESTIONS_SCHEMA = {
     "properties": {
         "questions": {
             "type": "array",
-            "description": "An array of 3-4 non-budget-related questions to ask the user.",
+            "description": "An array of 2-4 insightful, non-budget-related questions designed to clarify a user's priorities and context.",
             "items": {
                 "type": "object",
                 "properties": {
                     "questionType": {
                         "type": "string",
-                        "description": "The type of question.",
+                        "description": "The type of question, guiding how the user can respond.",
                         "enum": ["single", "multi"]
                     },
                     "question": {
                         "type": "string",
-                        "description": "The main text of the question presented to the user."
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "A brief explanation of why this question is important, educating the user on the key consideration it addresses."
+                        "description": "The clear, user-facing text of the question."
                     },
                     "options": {
                         "type": "array",
-                        "description": "A list of choices for the question.",
+                        "description": "A list of potential choices for the user to select from.",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "text": {
                                     "type": "string",
-                                    "description": "The concise label for the option (e.g., 'All-day Comfort')."
-                                },
-                                "description": {
-                                    "type": "string",
-                                    "description": "A short explanation of this specific choice, often highlighting a key benefit or trade-off."
+                                    "description": "The user-facing text for the choice. This represents a specific priority, use-case, or attribute."
                                 }
                             },
-                            "required": ["text", "description"]
+                            "required": ["text"]
                         }
                     }
                 },
-                "required": ["questionType", "question", "description", "options"]
+                "required": ["questionType", "question", "options"]
             }
         }
     },

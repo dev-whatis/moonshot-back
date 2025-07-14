@@ -88,33 +88,15 @@ async def route_user_query(
                 llm_calls.generate_diagnostic_questions, request.user_query
             )
 
-            budget_question, raw_diagnostic_questions = await asyncio.gather(
+            budget_question, diagnostic_questions = await asyncio.gather(
                 budget_task,
                 diagnostics_task
             )
 
-            # --- START: Transformation "Stop-Gap" Logic ---
-            # The LLM still returns descriptions, but we transform the data to
-            # our new, clean `StandardMCQ` schema before sending it to the client.
-            standardized_diagnostic_questions: List[StandardMCQ] = []
-            for raw_q in raw_diagnostic_questions:
-                # 1. Create standardized options, discarding descriptions.
-                standard_options = [StandardOption(text=opt['text']) for opt in raw_q.get('options', [])]
-                
-                # 2. Create the standardized question, discarding its description.
-                standard_question = StandardMCQ(
-                    question_type=raw_q.get('questionType'),
-                    question=raw_q.get('question'),
-                    options=standard_options
-                )
-                standardized_diagnostic_questions.append(standard_question)
-            # --- END: Transformation Logic ---
-
-
-            # Assemble the payload using the NEWLY standardized questions.
+            # Assemble the payload.
             payload = ProductDiscoveryPayload(
                 budget_question=budget_question,
-                diagnostic_questions=standardized_diagnostic_questions
+                diagnostic_questions=diagnostic_questions
             )
 
             return StartResponse(route="PRODUCT_DISCOVERY", payload=payload)
